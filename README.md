@@ -1065,9 +1065,9 @@ python manage.py shell -c "from django.core.cache import cache; print(cache.get(
 
 ### Team Contacts
 
-- **Backend Team**: [team-email@company.com]
-- **DevOps Team**: [devops-email@company.com]
-- **Project Lead**: [lead-email@company.com]
+- **Backend Team**: saikiranmekala@tarafirst.com, taraintern3@tarafirst.com, dharma@tarafirst.com
+- **DevOps Team**: saikiranmekala@tarafirst.com, taraintern3@tarafirst.com
+- **Project Lead**: saikiranmekala@tarafirst.com
 
 ## 📄 License
 
@@ -1076,5 +1076,5 @@ This project is proprietary software. All rights reserved.
 ---
 
 **Version**: 1.0.0  
-**Last Updated**: December 2024  
+**Last Updated**: September 2025  
 **Maintainer**: Development Team
