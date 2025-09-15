@@ -1,51 +1,50 @@
-# user_management/Dockerfile
-#FROM python:3.11-slim
-#
-#WORKDIR /app
-#
-#ENV PYTHONDONTWRITEBYTECODE=1
-#ENV PYTHONUNBUFFERED=1
-#
-#RUN apt-get update && apt-get install -y \
-#    build-essential \
-#    libpq-dev \
-#    && rm -rf /var/lib/apt/lists/*
-#
-#COPY requirements.txt .
-#RUN pip install --no-cache-dir -r requirements.txt
-#
-#COPY .. .
-#
-#EXPOSE 8000
-#
-#CMD ["gunicorn", "tara_user_management.wsgi:application", "--bind", "0.0.0.0:8000"]
-# Use slim base for smaller image
-FROM python:3.11-slim
+# -------------------
+# 1. Base builder image
+# -------------------
+FROM python:3.11-slim AS builder
 
-# Set work directory
 WORKDIR /app
 
-# Environment variables
+# Prevent Python from writing pyc files / forcing stdout flush
+#Prevent Python from writing pyc files / forcing stdout flush
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies first (better cache)
+# Install Python dependencies into /install (not system-wide)
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --prefix=/install -r requirements.txt
 
-# Copy only the app source code (not the whole repo root)
+# -------------------
+# 2. Final runtime image
+# -------------------
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy installed dependencies from builder stage
+COPY --from=builder /install /usr/local
+
+# Add a non-root user (security best practice)
+RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup
+USER appuser
+
+# Copy project files
 COPY . .
 
 # Expose Django/Gunicorn port
 EXPOSE 8000
 
-# Run gunicorn
+# Healthcheck endpoint (Django’s default or custom /healthz)
+#HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+#    CMD curl -f http://localhost:8000/user_management/test/ || exit 1
+
+# Run Gunicorn
 CMD ["gunicorn", "Tara.wsgi:application", "--bind", "0.0.0.0:8000"]
