@@ -1,0 +1,15 @@
+services:
+  user_management:
+    image: ${DOCKER_IMAGE}:${IMAGE_TAG}
+    container_name: user_management_service
+    ports:
+      - "8000:8000"
+    command: >
+      gunicorn Tara.wsgi:application --bind 0.0.0.0:8000
+    env_file:
+      - ../env/global.env
+    networks:
+      - micro_net
+networks:
+  micro_net:
+    external: true

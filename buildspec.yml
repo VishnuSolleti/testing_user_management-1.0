@@ -1,0 +1,213 @@
+#version: 0.2
+#
+#env:
+#  parameter-store:
+#    DOCKERHUB_USERNAME: /tara_backend/docker-credentials/username
+#    DOCKERHUB_PASSWORD: /tara_backend/docker-credentials/password
+#    SERVICES: /tara_backend/docker/service_name  # list of microservices
+#
+#phases:
+#  pre_build:
+#    commands:
+#      - echo "Logging in to DockerHub..."
+#      - echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
+#      - |
+#        echo "Getting Git commit hash..."
+#        export IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-7)
+#        echo "Commit hash tag: $IMAGE_TAG"
+#
+#  build:
+#    commands:
+#      - |
+#        for SERVICE in $SERVICES; do
+#          echo "Building Docker image for $SERVICE..."
+#          docker pull $DOCKERHUB_USERNAME/$SERVICE:latest || true
+#          docker build --cache-from $DOCKERHUB_USERNAME/$SERVICE:latest \
+#            -t $DOCKERHUB_USERNAME/$SERVICE:$IMAGE_TAG ./$SERVICE
+#          docker tag $DOCKERHUB_USERNAME/$SERVICE:$IMAGE_TAG $DOCKERHUB_USERNAME/$SERVICE:latest
+#        done
+#
+#  post_build:
+#    commands:
+#      - |
+#        for SERVICE in $SERVICES; do
+#          echo "Pushing Docker image for $SERVICE..."
+#          docker push $DOCKERHUB_USERNAME/$SERVICE:$IMAGE_TAG
+#          docker push $DOCKERHUB_USERNAME/$SERVICE:latest
+#        done
+#      - echo "Saving image tags for deployment..."
+#      - |
+#        for SERVICE in $SERVICES; do
+#          echo "$SERVICE:$IMAGE_TAG" >> image_tag.txt
+#        done
+#
+#artifacts:
+#  files:
+#    - appspec.yml
+#    - scripts/*
+#    - image_tag.txt
+#    - docker-compose.yml
+#
+#version: 0.2
+#
+#env:
+#  parameter-store:
+#    DOCKERHUB_USERNAME: /tara_backend/docker-credentials/username
+#    DOCKERHUB_PASSWORD: /tara_backend/docker-credentials/password
+#    SERVICES: /tara_backend/docker/service_name  # space-separated list of micr
+#
+#phases:
+#  pre_build:
+#    commands:
+#      - echo "Logging in to DockerHub."
+#      - echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
+#      - |
+#        echo "Getting Git commit hash..."
+#        export IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-7)
+#        echo "Commit hash tag: $IMAGE_TAG"
+#      - echo "Cleaning previous image_tag.txt..."
+#
+#  build:
+#    commands:
+#      - |
+#        for SERVICE in $SERVICES; do
+#          echo "Building Docker image for $SERVICE..."
+#          # Pull latest image as cache if exists
+#          docker pull $DOCKERHUB_USERNAME/$SERVICE:latest || true
+#          # Build with cache
+#          docker build --cache-from $DOCKERHUB_USERNAME/$SERVICE:latest \
+#            -t $DOCKERHUB_USERNAME/$SERVICE:$IMAGE_TAG ./$SERVICE
+#          docker tag $DOCKERHUB_USERNAME/$SERVICE:$IMAGE_TAG $DOCKERHUB_USERNAME/$SERVICE:latest
+#        done
+#
+#  post_build:
+#    commands:
+#      - |
+#        for SERVICE in $SERVICES; do
+#          IMAGE_FULL_NAME="$DOCKERHUB_USERNAME/$SERVICE:$IMAGE_TAG"
+#          echo "Pushing Docker image for $SERVICE..."
+#          docker push $IMAGE_FULL_NAME
+#          docker push $DOCKERHUB_USERNAME/$SERVICE:latest
+#          # Save in proper env format for docker-compose
+#          ENV_VAR_NAME=$(echo $SERVICE | tr 'a-z' 'A-Z')_IMAGE
+#          echo "$ENV_VAR_NAME=$IMAGE_FULL_NAME" >> image_tag.txt
+#        done
+#      - echo "Generated image_tag.txt:"
+#      - cat image_tag.txt
+#
+#artifacts:
+#  files:
+#    - appspec.yml
+#    - scripts/*
+#    - image_tag.txt
+#    - docker-compose.yml
+
+#version: 0.2
+#
+#cache:
+#  paths:
+#    - '/root/.cache/pip/**/*'
+#    - '/root/.docker/**/*'
+#
+#env:
+#  parameter-store:
+#    DOCKER_HUB_USERNAME: /tara_backend/docker-credentials/username
+#    DOCKER_HUB_PASSWORD: /tara_backend/docker-credentials/password
+#    DOCKER_IMAGE_NAME: /tara_backend/docker/user_management
+#
+#phases:
+#  install:
+#    runtime-versions:
+#      python: 3.x
+#    commands:
+#      - echo "[Install] Installing Docker..."
+#      - apt-get update && apt-get install -y docker.io jq awscli
+#
+#  pre_build:
+#    commands:
+#      - echo "[PreBuild] Logging in to Docker Hub..."
+#      - echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+#      - export IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+#      - export DOCKER_IMAGE=$DOCKER_IMAGE_NAME
+#      - echo "DOCKER_IMAGE=$DOCKER_IMAGE"
+#      - echo "IMAGE_TAG=$IMAGE_TAG"
+#      - echo "[PreBuild] Pulling cache image (latest) if available..."
+#      - export DOCKER_BUILDKIT=1
+#      - docker pull $DOCKER_IMAGE:latest || echo "Cache image not found, building from scratch"
+#
+#  build:
+#    commands:
+#      - echo "[Build] Building Docker image with caching..."
+#      - docker build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from=$DOCKER_IMAGE:latest -t $DOCKER_IMAGE:$IMAGE_TAG -t $DOCKER_IMAGE:latest .
+#      - echo "[Build] Pushing images..."
+#      - docker push $DOCKER_IMAGE:$IMAGE_TAG
+#      - docker push $DOCKER_IMAGE:latest
+#
+#  post_build:
+#    commands:
+#      - echo "[PostBuild] Generating image_vars.env..."
+#      - echo "DOCKER_IMAGE=$DOCKER_IMAGE" > image_vars.env
+#      - echo "IMAGE_TAG=$IMAGE_TAG" >> image_vars.env
+#      - chmod 644 image_vars.env
+#
+#artifacts:
+#  files:
+#    - image_vars.env
+#    - appspec.yml
+#    - scripts/*
+#    - docker-compose.yml
+
+
+version: 0.2
+
+env:
+  parameter-store:
+    DOCKER_HUB_USERNAME: /tara_backend/docker-credentials/username
+    DOCKER_HUB_PASSWORD: /tara_backend/docker-credentials/password
+    DOCKER_IMAGE_NAME: /tara_backend/docker/user_management
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.x
+    commands:
+      - echo "[Install] Installing Docker..."
+      - apt-get update && apt-get install -y docker.io jq awscli
+
+  pre_build:
+    commands:
+      - echo "[PreBuild] Logging in to Docker Hub..."
+      - echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+      - export IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - export DOCKER_IMAGE=$DOCKER_IMAGE_NAME
+      - echo "DOCKER_IMAGE=$DOCKER_IMAGE"
+      - echo "IMAGE_TAG=$IMAGE_TAG"
+      - echo "[PreBuild] Pulling cache image (latest) if available..."
+      - export DOCKER_BUILDKIT=1
+      - docker pull $DOCKER_IMAGE:latest || echo "Cache image not found, building from scratch"
+
+  build:
+    commands:
+      - echo "[Build] Building Docker image with caching..."
+      - docker build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from=$DOCKER_IMAGE:latest -t $DOCKER_IMAGE:$IMAGE_TAG -t $DOCKER_IMAGE:latest .
+      - echo "[Build] Pushing images..."
+      - docker push $DOCKER_IMAGE:$IMAGE_TAG
+      - docker push $DOCKER_IMAGE:latest
+
+  post_build:
+    commands:
+      - echo "[PostBuild] Generating image_vars.env..."
+      - echo "DOCKER_IMAGE=$DOCKER_IMAGE" > image_vars.env
+      - echo "IMAGE_TAG=$IMAGE_TAG" >> image_vars.env
+      - chmod 644 image_vars.env
+
+artifacts:
+  files:
+    - image_vars.env
+    - appspec.yml
+    - scripts/*
+    - docker-compose.yml
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'   # caches pip packages
+    - '/root/.docker/**/*'      # caches Docker layers
