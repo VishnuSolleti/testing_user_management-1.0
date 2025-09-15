@@ -32,6 +32,9 @@ WORKDIR /app
 # Copy installed dependencies from builder stage
 COPY --from=builder /install /usr/local
 
+# Create log file and give permissions
+RUN touch /app/application.log && chmod 666 /app/application.log
+
 # Add a non-root user (security best practice)
 RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup
 USER appuser
