@@ -359,6 +359,8 @@ urlpatterns = [
     path('role/create', feature_views.create_role_for_employee, name= 'create_role_for_employee'),
     path('subscription-cycles', subscription_views.get_subscription_cycle, name='get_subscription_cycle'),
     path('get-module-usage-cycle/', subscription_views.get_module_usage_cycle, name='get_module_usage_cycle'),
-    path('module-usage-cycle/update', subscription_views.update_module_usage_cycle, name='update_module_usage_cycle')
+    path('module-usage-cycle/update', subscription_views.update_module_usage_cycle, name='update_module_usage_cycle'),
+
+    path('test/', views.hello, name='hello'),
 
 ]

@@ -51,9 +51,11 @@ echo "[Stop] 🛑 Stopping and removing old containers..."
 cd /home/ubuntu/tarafirst_user_management
 
 if [ -f docker-compose.yml ]; then
-  docker compose down --remove-orphans || true
+  docker-compose --env-file image_vars.env down || true
 fi
 
 # Remove dangling (stopped) containers if any
 echo "[Stop] 🧹 Cleaning up stopped containers..."
 docker container prune -f || true
+
+

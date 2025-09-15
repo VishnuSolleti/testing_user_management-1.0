@@ -51,7 +51,7 @@ xlrd==2.0.1
 Pillow==10.4.0
 python-dotenv==1.0.1
 Markdown==3.6
-numpy==2.3.0
+numpy==2.2.6
 num2words==0.5.13
 fiscalyear==0.4.0
 jsonfield==3.1.0

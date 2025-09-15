@@ -12,7 +12,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-
+from django.http import HttpResponse
 # Local application imports
 from .email_otp_request_service import send_otp_email
 from .helpers import generate_otp
@@ -527,4 +527,8 @@ def get_usage_summary_by_context(request, context_id):
             "error": "Failed to fetch usage summary.",
             "details": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+ def hello(request):
+    return HttpResponse("Hello, User Management is Workings!")
 
