@@ -529,6 +529,6 @@ def get_usage_summary_by_context(request, context_id):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
- def hello(request):
+def hello(request):
     return HttpResponse("Hello, User Management is Workings!")
 
