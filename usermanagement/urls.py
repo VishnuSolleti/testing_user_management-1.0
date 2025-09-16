@@ -22,6 +22,7 @@ from . import create_service_request
 from . import accounts_registration
 from . import accounts_auth
 from . import user_context_permissions
+from . import google_oauth
 
 
 urlpatterns = [
@@ -338,6 +339,11 @@ urlpatterns = [
     path('register/accounts/', accounts_registration.accounts_register, name='accounts_register'),
 
     path('auth/accounts-login/', accounts_auth.accounts_login, name='accounts_login'),
+    
+    # Google OAuth endpoints
+    path('auth/google/debug/', google_oauth.debug_google_settings, name='google_oauth_debug'),
+    path('auth/google/initiate/', google_oauth.initiate_google_oauth, name='google_oauth_initiate'),
+    path('auth/google/callback/', google_oauth.google_oauth_callback, name='google_oauth_callback'),
 
     # User Context and Permissions APIs
     path('user/current-session/', user_context_permissions.get_current_user_session, name='get_current_user_session'),

@@ -320,6 +320,29 @@ class Users(AbstractBaseUser):
     is_active = models.BooleanField(default=False, help_text="Indicates if the user account is active")
     is_super_admin = models.BooleanField(default=False, editable=False)
     
+    # Google OAuth fields
+    google_user_id = models.CharField(max_length=100, null=True, blank=True, help_text="Google's unique user ID")
+    google_name = models.CharField(max_length=200, null=True, blank=True, help_text="Name from Google account")
+    auth_provider = models.CharField(
+        max_length=20,
+        choices=[
+            ('email', 'Email/Password'),
+            ('google', 'Google OAuth'),
+            ('both', 'Both Email and Google')
+        ],
+        default='email',
+        help_text="Authentication method used by the user"
+    )
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['google_user_id'],
+                condition=models.Q(google_user_id__isnull=False),
+                name='unique_google_user_id_when_not_null'
+            )
+        ]
+    
     # REMOVED FIELDS (now handled by separate models):
     # - mobile_number → UserProfile.mobile_number
     # - active_context → UserSession.active_context
@@ -579,7 +602,8 @@ class UserRegistration(models.Model):
         choices=[
             ('module', 'Module-based'),
             ('service', 'Service-based'),
-            ('standard', 'Standard')
+            ('standard', 'Standard'),
+            ('google_oauth', 'Google OAuth')
         ],
         null=True,
         blank=True,

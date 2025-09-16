@@ -29,6 +29,12 @@ from urllib.parse import urlparse, parse_qs
 from .models import Users, Context, ModuleSubscription
 from .rate_limit_decorator import rate_limit
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import get_user_model
+import requests
+import logging
+
+User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -237,10 +243,16 @@ def get_user_available_services(user):
 @permission_classes([AllowAny])
 def accounts_login(request):
     """
-    Accounts central login endpoint
-    Handles login for all services and routes intelligently
+    Enhanced accounts central login endpoint
+    Handles both email/password AND Google OAuth login
     """
     try:
+        # Check if this is Google OAuth login
+        google_token = request.data.get('google_token')
+        if google_token:
+            return handle_google_oauth_login(request)
+        
+        # Regular email/password login (existing logic)
         email = request.data.get('email')
         password = request.data.get('password')
         
@@ -542,4 +554,169 @@ def accounts_frontend_integration():
             'available_services': '/user_management/auth/user-services/'
         }
     }
+
+
+# =============================================================================
+# GOOGLE OAUTH INTEGRATION
+# =============================================================================
+
+def handle_google_oauth_login(request):
+    """
+    Handle Google OAuth login within the accounts system
+    """
+    try:
+        google_token = request.data.get('google_token')
+        
+        if not google_token:
+            return Response({
+                'error': 'Google token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verify Google token and get user info
+        google_user_info = verify_google_token(google_token)
+        
+        if not google_user_info:
+            return Response({
+                'error': 'Invalid Google token'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Extract user data from Google
+        email = google_user_info.get('email')
+        google_id = google_user_info.get('id')
+        name = google_user_info.get('name')
+        
+        if not email or not google_id:
+            return Response({
+                'error': 'Invalid user data from Google'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Handle user creation/linking (using existing logic)
+        user = handle_google_user_in_accounts(email, google_id, name)
+        
+        if not user:
+            return Response({
+                'error': 'Failed to create or link user account'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Continue with your existing login flow (same as regular login)
+        return generate_accounts_login_response(request, user)
+        
+    except Exception as e:
+        logger.exception("Google OAuth login failed in accounts system")
+        return Response({
+            'error': f'Google OAuth login failed: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def verify_google_token(google_token):
+    """
+    Verify Google token and return user info
+    """
+    try:
+        response = requests.get(
+            f'https://www.googleapis.com/oauth2/v2/userinfo?access_token={google_token}'
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Google API error: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        logger.exception("Error verifying Google token")
+        return None
+
+
+def handle_google_user_in_accounts(email, google_id, name):
+    """
+    Handle Google user creation or linking within accounts system
+    """
+    try:
+        # Check if user already exists by email
+        try:
+            existing_user = User.objects.get(email=email)
+            
+            # User exists - link Google account
+            if existing_user.google_user_id:
+                # User already has Google linked
+                if existing_user.google_user_id != google_id:
+                    logger.error(f"User {email} already has different Google account linked")
+                    return None
+                # Same Google account, update name if needed
+                existing_user.google_name = name
+                existing_user.auth_provider = 'both' if existing_user.has_usable_password() else 'google'
+                existing_user.save()
+                return existing_user
+            else:
+                # Link Google to existing user
+                existing_user.google_user_id = google_id
+                existing_user.google_name = name
+                existing_user.auth_provider = 'both' if existing_user.has_usable_password() else 'google'
+                existing_user.save()
+                logger.info(f"Linked Google account to existing user: {email}")
+                return existing_user
+                
+        except User.DoesNotExist:
+            # User doesn't exist - create new user (like standard registration)
+            new_user = User.objects.create(
+                email=email,
+                google_user_id=google_id,
+                google_name=name,
+                auth_provider='google',
+                status='active',
+                is_active=True
+            )
+            logger.info(f"Created new Google OAuth user: {email}")
+            return new_user
+            
+    except Exception as e:
+        logger.exception(f"Error handling Google user: {email}")
+        return None
+
+
+def generate_accounts_login_response(request, user):
+    """
+    Generate the same login response as your existing accounts_login function
+    """
+    try:
+        # Generate Django built-in JWT tokens (same as your existing code)
+        refresh = RefreshToken.for_user(user)
+        access_token = refresh.access_token
+        refresh_token = str(refresh)
+        
+        # Detect requested service from URL/Referer (same as your existing code)
+        detected_service = detect_service_from_url(request)
+        
+        # Get user's available services (same as your existing code)
+        available_services = get_user_available_services(user)
+        
+        # Get user's current active context (same as your existing code)
+        try:
+            user_session = user.get_active_session()
+            active_context_id = user_session.active_context.id if user_session and user_session.active_context else None
+        except:
+            active_context_id = None
+        
+        # Return the same response format as your existing login
+        return Response({
+            'message': 'Login successful',
+            'access_token': str(access_token),
+            'refresh_token': refresh_token,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.google_name or user.first_name,
+                'auth_provider': user.auth_provider
+            },
+            'detected_service': detected_service,
+            'available_services': available_services,
+            'active_context_id': active_context_id
+        })
+        
+    except Exception as e:
+        logger.exception("Error generating accounts login response")
+        return Response({
+            'error': 'Failed to generate login response'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
