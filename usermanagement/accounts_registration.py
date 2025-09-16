@@ -39,6 +39,7 @@ from .models import (
 )
 from Tara.settings.default import *
 from .rate_limit_decorator import rate_limit
+import requests
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -161,11 +162,16 @@ def detect_registration_type_from_url(request):
 @rate_limit(key='ip', rate='100/h', message='Too many registration attempts. Try again in 1 hour.')
 def accounts_register(request):
     """
-    Accounts unified registration endpoint
-    Handles all registration types through intelligent detection and routing
+    Enhanced accounts unified registration endpoint
+    Handles all registration types including Google OAuth registration
     """
     try:
-        # Detect registration type
+        # Check if this is Google OAuth registration
+        google_token = request.data.get('google_token')
+        if google_token:
+            return handle_google_oauth_registration(request)
+        
+        # Regular registration flow (existing logic)
         registration_config = detect_registration_type_from_url(request)
         registration_type = registration_config['registration_type']
         
@@ -714,3 +720,120 @@ def zoho_style_registration_redirect(request, registration_type):
         return Response({
             'error': f'Registration redirect failed: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =============================================================================
+# GOOGLE OAUTH REGISTRATION
+# =============================================================================
+
+def handle_google_oauth_registration(request):
+    """
+    Handle Google OAuth registration as standard registration
+    """
+    try:
+        google_token = request.data.get('google_token')
+        
+        if not google_token:
+            return Response({
+                'error': 'Google token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verify Google token and get user info
+        google_user_info = verify_google_token_for_registration(google_token)
+        
+        if not google_user_info:
+            return Response({
+                'error': 'Invalid Google token'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Extract user data from Google
+        email = google_user_info.get('email')
+        google_id = google_user_info.get('id')
+        name = google_user_info.get('name')
+        
+        if not email or not google_id:
+            return Response({
+                'error': 'Invalid user data from Google'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if user already exists
+        try:
+            existing_user = User.objects.get(email=email)
+            return Response({
+                'error': 'User with this email already exists. Please use login instead.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            pass  # User doesn't exist, continue with registration
+        
+        # Create new user with Google OAuth data (following standard registration pattern)
+        with transaction.atomic():
+            # 1. Create user (following standard registration pattern)
+            new_user = User.objects.create(
+                email=email,
+                google_user_id=google_id,
+                google_name=name,
+                auth_provider='google',
+                status='active',
+                is_active=True,
+                is_super_admin=False,
+            )
+            
+            # 2. Update UserRegistration (same as standard registration)
+            from .models import UserRegistration
+            user_registration, created = UserRegistration.objects.get_or_create(
+                user=new_user,
+                defaults={
+                    'registration_flow': 'google_oauth',
+                    'initial_selection': None,
+                    'registration_completed': True,  # Google OAuth is complete registration
+                    'registration_status': 'completed',
+                    'steps_completed': ['user_created', 'google_oauth_verified']
+                }
+            )
+            if not created:
+                # Update existing record
+                user_registration.registration_flow = 'google_oauth'
+                user_registration.initial_selection = None
+                user_registration.registration_completed = True
+                user_registration.registration_status = 'completed'
+                user_registration.steps_completed = ['user_created', 'google_oauth_verified']
+                user_registration.save()
+            
+            # 3. Get login response (same as standard registration)
+            login_response_data = get_login_response(new_user)
+            
+            logger.info(f"Created new Google OAuth user: {email}")
+            
+            return Response({
+                'success': True,
+                'message': 'Google OAuth registration successful',
+                'registration_type': 'google_oauth',
+                'user': login_response_data['user'],
+                'tokens': login_response_data['tokens']
+            }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.exception("Google OAuth registration failed")
+        return Response({
+            'error': f'Google OAuth registration failed: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def verify_google_token_for_registration(google_token):
+    """
+    Verify Google token and return user info for registration
+    """
+    try:
+        response = requests.get(
+            f'https://www.googleapis.com/oauth2/v2/userinfo?access_token={google_token}'
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Google API error: {response.status_code}")
+            return None
+            
+    except Exception as e:
+        logger.exception("Error verifying Google token for registration")
+        return None
