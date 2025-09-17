@@ -576,33 +576,33 @@ def accounts_login(request):
         # Create response with cookie support
         response = Response(response_data, status=status.HTTP_200_OK)
         
-        # Set cookies for local development
+        # Set cookies for cross-subdomain support
         response.set_cookie(
             'access_token',
             str(access_token),
-            domain='localhost',                   # Local development
-            secure=False,                         # HTTP allowed for localhost
-            httponly=True,                        # No JS access (XSS protection)
-            samesite='Lax',                      # CSRF protection
-            max_age=43200                        # 12 hours
+            domain='.tarafirst.com',             # Works across all subdomains
+            secure=True,                         # HTTPS required
+            httponly=True,                       # No JS access (XSS protection)
+            samesite='Lax',                     # CSRF protection
+            max_age=43200                       # 12 hours
         )
 
         response.set_cookie(
             'refresh_token',
             refresh_token,
-            domain='localhost',                   # Local development
-            secure=False,                         # HTTP allowed for localhost
-            httponly=True,                        # No JS access (XSS protection)
-            samesite='Lax',                      # CSRF protection
-            max_age=86400                        # 24 hours
+            domain='.tarafirst.com',             # Works across all subdomains
+            secure=True,                         # HTTPS required
+            httponly=True,                       # No JS access (XSS protection)
+            samesite='Lax',                     # CSRF protection
+            max_age=86400                       # 24 hours
         )
 
         # Set user context cookie for frontend state management
         response.set_cookie(
             'user_context',
             str(context_id) if context_id else '',
-            domain='localhost',
-            secure=False,
+            domain='.tarafirst.com',
+            secure=True,
             httponly=False,                      # Allow JS access for context switching
             samesite='Lax',
             max_age=86400
@@ -612,8 +612,8 @@ def accounts_login(request):
         response.set_cookie(
             'active_service',
             detected_service.get('service_key', ''),
-            domain='localhost',
-            secure=False,
+            domain='.tarafirst.com',
+            secure=True,
             httponly=False,                      # Allow JS access for service routing
             samesite='Lax',
             max_age=86400
@@ -623,8 +623,8 @@ def accounts_login(request):
         response.set_cookie(
             'organization_id',
             str(organization_id) if organization_id else '',
-            domain='localhost',
-            secure=False,
+            domain='.tarafirst.com',
+            secure=True,
             httponly=False,                      # Allow JS access for organization context
             samesite='Lax',
             max_age=86400
