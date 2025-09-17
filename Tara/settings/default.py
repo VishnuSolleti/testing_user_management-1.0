@@ -54,8 +54,8 @@ CSRF_COOKIE_DOMAIN = 'dev-backend.tarafirst.com'
 # Allow credentials in CORS
 CORS_ALLOW_CREDENTIALS = True
 
-# Allow all origins for development (change for production)
-CORS_ALLOW_ALL_ORIGINS = True
+# DISABLE wildcard origins when using credentials (cookies)
+CORS_ALLOW_ALL_ORIGINS = False
 
 # Specific subdomain support for production
 CORS_ALLOWED_ORIGINS = [
