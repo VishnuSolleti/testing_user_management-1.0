@@ -82,6 +82,19 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
     'cookie',
 ]
+
+# Additional CORS settings for credentials
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Ensure preflight requests work
+CORS_PREFLIGHT_MAX_AGE = 86400
 # Define base directory and log path
 LOG_PATH = os.path.join(BASE_DIR, 'log')
 
