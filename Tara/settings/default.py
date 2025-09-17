@@ -54,8 +54,7 @@ CSRF_COOKIE_DOMAIN = 'dev-backend.tarafirst.com'
 # Allow credentials in CORS
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ORIGIN_ALLOW_ALL =True
-
+CORS_ALLOW_ALL_ORIGINS = True
 # Define base directory and log path
 LOG_PATH = os.path.join(BASE_DIR, 'log')
 
