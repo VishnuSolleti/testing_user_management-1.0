@@ -26,6 +26,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 import re
 from urllib.parse import urlparse, parse_qs
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 from .models import Users, Context, ModuleSubscription
 from .rate_limit_decorator import rate_limit
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -239,6 +241,213 @@ def get_user_available_services(user):
 # ACCOUNTS LOGIN ENDPOINTS
 # =============================================================================
 
+@extend_schema(
+    operation_id='accounts_login',
+    summary='Unified Accounts Login',
+    description='''
+    Enhanced central login endpoint that handles multiple authentication methods:
+    
+    **Authentication Methods:**
+    1. **Email/Password Login** - Traditional login with email and password
+    2. **Google OAuth Login** - Social login using Google OAuth token
+    
+    **Features:**
+    - Service detection from URL/Referer header
+    - Automatic context switching
+    - Available services detection
+    - Smart routing after login
+    - Cross-subdomain cookie support
+    
+    **Response includes:**
+    - JWT access and refresh tokens
+    - User profile information
+    - Active context details
+    - Available services list
+    - Module subscriptions
+    - Service requests
+    ''',
+    tags=['Authentication'],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'email': {
+                    'type': 'string', 
+                    'format': 'email', 
+                    'description': 'User email address',
+                    'example': 'user@example.com'
+                },
+                'password': {
+                    'type': 'string', 
+                    'description': 'User password',
+                    'example': 'SecurePassword123!'
+                },
+                'google_token': {
+                    'type': 'string', 
+                    'description': 'Google OAuth access token (for Google OAuth login)',
+                    'example': 'ya29.a0AfH6SMC...'
+                }
+            },
+            'oneOf': [
+                {
+                    'required': ['email', 'password'],
+                    'title': 'Email/Password Login'
+                },
+                {
+                    'required': ['google_token'],
+                    'title': 'Google OAuth Login'
+                }
+            ]
+        }
+    },
+    responses={
+        200: {
+            'description': 'Login successful',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'message': {'type': 'string', 'example': 'Login successful'},
+                        'access_token': {'type': 'string', 'example': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'},
+                        'refresh_token': {'type': 'string', 'example': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'},
+                        'user': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'integer', 'example': 123},
+                                'email': {'type': 'string', 'example': 'user@example.com'},
+                                'mobile_number': {'type': 'string', 'example': '+1234567890'},
+                                'status': {'type': 'string', 'example': 'active'},
+                                'registration_completed': {'type': 'boolean', 'example': True},
+                                'is_super_admin': {'type': 'boolean', 'example': False}
+                            }
+                        },
+                        'active_context': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'integer', 'example': 456},
+                                'name': {'type': 'string', 'example': 'My Business'},
+                                'context_type': {'type': 'string', 'enum': ['personal', 'business'], 'example': 'business'},
+                                'status': {'type': 'string', 'example': 'active'},
+                                'profile_status': {'type': 'string', 'example': 'complete'},
+                                'business_id': {'type': 'integer', 'example': 789}
+                            }
+                        },
+                        'all_contexts': {
+                            'type': 'array',
+                            'items': {
+                                'type': 'object',
+                                'properties': {
+                                    'id': {'type': 'integer'},
+                                    'name': {'type': 'string'},
+                                    'context_type': {'type': 'string'},
+                                    'is_active': {'type': 'boolean'}
+                                }
+                            }
+                        },
+                        'user_role': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'integer', 'example': 1},
+                                'name': {'type': 'string', 'example': 'Owner'},
+                                'role_type': {'type': 'string', 'example': 'owner'},
+                                'description': {'type': 'string', 'example': 'Business owner with full access'}
+                            }
+                        },
+                        'available_services': {
+                            'type': 'array',
+                            'items': {'type': 'string'},
+                            'example': ['payroll', 'accounting', 'gst']
+                        },
+                        'detected_service': {
+                            'type': 'string',
+                            'example': 'payroll',
+                            'description': 'Service detected from URL/Referer'
+                        },
+                        'redirect_url': {
+                            'type': 'string',
+                            'example': 'https://payroll.tarafirst.com/dashboard',
+                            'description': 'URL to redirect after login'
+                        },
+                        'module_subscriptions': {
+                            'type': 'array',
+                            'items': {
+                                'type': 'object',
+                                'properties': {
+                                    'module_name': {'type': 'string'},
+                                    'plan_name': {'type': 'string'},
+                                    'status': {'type': 'string'}
+                                }
+                            }
+                        },
+                        'service_requests': {
+                            'type': 'array',
+                            'items': {
+                                'type': 'object',
+                                'properties': {
+                                    'id': {'type': 'integer'},
+                                    'service_name': {'type': 'string'},
+                                    'status': {'type': 'string'}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            'description': 'Bad Request - Missing or invalid parameters',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'error': {'type': 'string', 'example': 'Email and password are required'}
+                    }
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - Invalid credentials or inactive account',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'error': {'type': 'string', 'example': 'Invalid credentials'}
+                    }
+                }
+            }
+        },
+        500: {
+            'description': 'Internal Server Error',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'error': {'type': 'string', 'example': 'Login failed: Internal server error'}
+                    }
+                }
+            }
+        }
+    },
+    examples=[
+        OpenApiExample(
+            'Email/Password Login',
+            summary='Traditional login with email and password',
+            description='Login using email and password credentials',
+            value={
+                'email': 'user@example.com',
+                'password': 'SecurePassword123!'
+            }
+        ),
+        OpenApiExample(
+            'Google OAuth Login',
+            summary='Social login with Google OAuth',
+            description='Login using Google OAuth access token',
+            value={
+                'google_token': 'ya29.a0AfH6SMC_example_google_access_token_here'
+            }
+        )
+    ]
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def accounts_login(request):
@@ -364,7 +573,64 @@ def accounts_login(request):
             }
         }
         
-        return Response(response_data, status=status.HTTP_200_OK)
+        # Create response with cookie support
+        response = Response(response_data, status=status.HTTP_200_OK)
+        
+        # Set cookies for local development
+        response.set_cookie(
+            'access_token',
+            str(access_token),
+            domain='localhost',                   # Local development
+            secure=False,                         # HTTP allowed for localhost
+            httponly=True,                        # No JS access (XSS protection)
+            samesite='Lax',                      # CSRF protection
+            max_age=43200                        # 12 hours
+        )
+
+        response.set_cookie(
+            'refresh_token',
+            refresh_token,
+            domain='localhost',                   # Local development
+            secure=False,                         # HTTP allowed for localhost
+            httponly=True,                        # No JS access (XSS protection)
+            samesite='Lax',                      # CSRF protection
+            max_age=86400                        # 24 hours
+        )
+
+        # Set user context cookie for frontend state management
+        response.set_cookie(
+            'user_context',
+            str(context_id) if context_id else '',
+            domain='localhost',
+            secure=False,
+            httponly=False,                      # Allow JS access for context switching
+            samesite='Lax',
+            max_age=86400
+        )
+
+        # Set active service cookie for service detection
+        response.set_cookie(
+            'active_service',
+            detected_service.get('service_key', ''),
+            domain='localhost',
+            secure=False,
+            httponly=False,                      # Allow JS access for service routing
+            samesite='Lax',
+            max_age=86400
+        )
+
+        # Set organization cookie for multi-tenant support
+        response.set_cookie(
+            'organization_id',
+            str(organization_id) if organization_id else '',
+            domain='localhost',
+            secure=False,
+            httponly=False,                      # Allow JS access for organization context
+            samesite='Lax',
+            max_age=86400
+        )
+        
+        return response
         
     except Exception as e:
         return Response({

@@ -23,6 +23,7 @@ from . import accounts_registration
 from . import accounts_auth
 from . import user_context_permissions
 from . import google_oauth
+from . import cookie_auth_views
 
 
 urlpatterns = [
@@ -344,6 +345,11 @@ urlpatterns = [
     path('auth/google/debug/', google_oauth.debug_google_settings, name='google_oauth_debug'),
     path('auth/google/initiate/', google_oauth.initiate_google_oauth, name='google_oauth_initiate'),
     path('auth/google/callback/', google_oauth.google_oauth_callback, name='google_oauth_callback'),
+    
+    # Cookie-based authentication endpoints
+    path('auth/cookie/logout/', cookie_auth_views.cookie_logout, name='cookie_logout'),
+    path('auth/cookie/refresh/', cookie_auth_views.cookie_refresh_token, name='cookie_refresh_token'),
+    path('auth/cookie/status/', cookie_auth_views.check_auth_status, name='check_auth_status'),
 
     # User Context and Permissions APIs
     path('user/current-session/', user_context_permissions.get_current_user_session, name='get_current_user_session'),
