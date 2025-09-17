@@ -31,6 +31,8 @@ import boto3
 import logging
 import re
 from urllib.parse import urlparse, parse_qs
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 from .get_login_data import get_login_response
 from .models import (
@@ -157,6 +159,235 @@ def detect_registration_type_from_url(request):
 # ACCOUNTS UNIFIED REGISTRATION ENDPOINT
 # =============================================================================
 
+@extend_schema(
+    operation_id='accounts_register',
+    summary='Unified Accounts Registration',
+    description='''
+    **Enhanced unified registration endpoint that intelligently handles multiple registration types:**
+    
+    ### Registration Types:
+    1. **Business Registration** - Register business with module subscription
+    2. **Service Registration** - Register for specific service access  
+    3. **Standard/Personal Registration** - Basic user registration
+    4. **Google OAuth Registration** - Social registration using Google
+    
+    ### Auto-Detection Features:
+    - Detects registration type from URL/Referer header
+    - Routes to appropriate registration handler
+    - Supports OTP verification for email validation
+    - Creates appropriate contexts and permissions
+    
+    ### Business Registration Flow:
+    1. Validates OTP and required fields
+    2. Creates user account  
+    3. Creates business context
+    4. Assigns owner role
+    5. Creates module subscription (trial)
+    6. Sets up permissions
+    
+    ### Service Registration Flow:
+    1. Validates service access
+    2. Creates user account
+    3. Creates service request
+    4. Sets up payment if required
+    
+    ### Standard Registration Flow:
+    1. Creates basic user account
+    2. Creates personal context
+    3. Assigns basic permissions
+    ''',
+    tags=['Registration'],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'google_token': {
+                    'type': 'string',
+                    'description': 'Google OAuth access token (for Google OAuth registration)',
+                    'example': 'ya29.a0AfH6SMC_example_token'
+                },
+                'email': {
+                    'type': 'string',
+                    'format': 'email',
+                    'description': 'User email address',
+                    'example': 'user@example.com'
+                },
+                'password': {
+                    'type': 'string',
+                    'description': 'User password (min 8 characters)',
+                    'example': 'SecurePassword123!'
+                },
+                'first_name': {
+                    'type': 'string',
+                    'description': 'User first name',
+                    'example': 'John'
+                },
+                'last_name': {
+                    'type': 'string',
+                    'description': 'User last name',
+                    'example': 'Doe'
+                },
+                'mobile_number': {
+                    'type': 'string',
+                    'description': 'User mobile number',
+                    'example': '+1234567890'
+                },
+                'otp': {
+                    'type': 'string',
+                    'description': 'OTP verification code',
+                    'example': '123456'
+                },
+                'business_name': {
+                    'type': 'string',
+                    'description': 'Business name (for business registration)',
+                    'example': 'My Tech Company'
+                },
+                'module_id': {
+                    'type': 'integer',
+                    'description': 'Module ID for business subscription',
+                    'example': 1
+                },
+                'service_id': {
+                    'type': 'integer',
+                    'description': 'Service ID (for service registration)',
+                    'example': 5
+                },
+                'plan_id': {
+                    'type': 'integer',
+                    'description': 'Service plan ID',
+                    'example': 10
+                },
+                'registration_type': {
+                    'type': 'string',
+                    'enum': ['business', 'service', 'personal', 'standard'],
+                    'description': 'Registration type (auto-detected if not provided)',
+                    'example': 'business'
+                }
+            }
+        }
+    },
+    responses={
+        201: {
+            'description': 'Registration successful',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'message': {'type': 'string', 'example': 'Registration successful'},
+                        'access_token': {'type': 'string', 'example': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'},
+                        'refresh_token': {'type': 'string', 'example': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'},
+                        'user': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'integer', 'example': 123},
+                                'email': {'type': 'string', 'example': 'user@example.com'},
+                                'registration_flow': {'type': 'string', 'example': 'business'},
+                                'registration_completed': {'type': 'boolean', 'example': True}
+                            }
+                        },
+                        'context': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'integer', 'example': 456},
+                                'name': {'type': 'string', 'example': 'My Tech Company'},
+                                'context_type': {'type': 'string', 'example': 'business'},
+                                'profile_status': {'type': 'string', 'example': 'complete'}
+                            }
+                        },
+                        'registration_type': {'type': 'string', 'example': 'business'},
+                        'detected_from': {'type': 'string', 'example': 'url_path'}
+                    }
+                }
+            }
+        },
+        400: {
+            'description': 'Bad Request - Validation errors',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'error': {'type': 'string', 'example': 'Invalid OTP or missing required fields'}
+                    }
+                }
+            }
+        },
+        409: {
+            'description': 'Conflict - User already exists',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'error': {'type': 'string', 'example': 'User already exists with this email'}
+                    }
+                }
+            }
+        },
+        429: {
+            'description': 'Too Many Requests - Rate limit exceeded',
+            'content': {
+                'application/json': {
+                    'type': 'object',
+                    'properties': {
+                        'error': {'type': 'string', 'example': 'Too many registration attempts. Try again in 1 hour.'}
+                    }
+                }
+            }
+        }
+    },
+    examples=[
+        OpenApiExample(
+            'Business Registration',
+            summary='Register a business with module subscription',
+            description='Complete business registration with Payroll module subscription',
+            value={
+                'email': 'owner@mybusiness.com',
+                'password': 'SecurePassword123!',
+                'first_name': 'John',
+                'last_name': 'Doe',
+                'mobile_number': '+1234567890',
+                'business_name': 'My Tech Company',
+                'module_id': 1,
+                'otp': '123456'
+            }
+        ),
+        OpenApiExample(
+            'Service Registration',
+            summary='Register for a specific service',
+            description='Register user for GST Registration service',
+            value={
+                'email': 'user@example.com',
+                'password': 'SecurePassword123!',
+                'first_name': 'Jane',
+                'last_name': 'Smith',
+                'mobile_number': '+1234567890',
+                'service_id': 5,
+                'plan_id': 10,
+                'otp': '654321'
+            }
+        ),
+        OpenApiExample(
+            'Standard Registration',
+            summary='Basic user registration',
+            description='Standard personal user registration',
+            value={
+                'email': 'user@example.com',
+                'password': 'SecurePassword123!',
+                'first_name': 'Alice',
+                'last_name': 'Johnson',
+                'mobile_number': '+1234567890',
+                'otp': '789012'
+            }
+        ),
+        OpenApiExample(
+            'Google OAuth Registration',
+            summary='Register using Google OAuth',
+            description='Social registration using Google OAuth token',
+            value={
+                'google_token': 'ya29.a0AfH6SMC_example_google_access_token_here'
+            }
+        )
+    ]
+)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @rate_limit(key='ip', rate='100/h', message='Too many registration attempts. Try again in 1 hour.')
