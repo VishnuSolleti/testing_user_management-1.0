@@ -576,9 +576,13 @@ def accounts_login(request):
         # Create response with cookie support
         response = Response(response_data, status=status.HTTP_200_OK)
         
-        # Simple cookie settings for local testing
-        cookie_domain = None    # No domain restriction - works everywhere
-        cookie_secure = False   # Allow HTTP for local testing
+        # Simple cookie settings for localhost testing
+        cookie_domain = 'localhost'    # Fixed to localhost for now
+        cookie_secure = False          # Allow HTTP for testing
+        
+        # Debug: Log what domain we're setting
+        print(f"DEBUG: Setting cookies with domain={cookie_domain}, secure={cookie_secure}")
+        print(f"DEBUG: Request host={request.get_host()}")
         
         # Set environment-aware cookies
         response.set_cookie(
