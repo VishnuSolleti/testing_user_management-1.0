@@ -240,7 +240,7 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',  # Only JSON response, no HTML
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-    'EXCEPTION_HANDLER': 'Tara.utils.custom_exception_handler'
+    # 'EXCEPTION_HANDLER': 'Tara.utils.custom_exception_handler'  # Commented out - module doesn't exist
 }
 
 # Swagger/OpenAPI Configuration
