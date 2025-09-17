@@ -54,7 +54,34 @@ CSRF_COOKIE_DOMAIN = 'dev-backend.tarafirst.com'
 # Allow credentials in CORS
 CORS_ALLOW_CREDENTIALS = True
 
+# Allow all origins for development (change for production)
 CORS_ALLOW_ALL_ORIGINS = True
+
+# Specific subdomain support for production
+CORS_ALLOWED_ORIGINS = [
+    "http://dev-backend-accounts.tarafirst.com",
+    "http://dev-backend-payroll.tarafirst.com",
+    "http://dev-backend-docdraft.tarafirst.com",
+    "http://dev-backend-invoicing.tarafirst.com",
+    "http://dev-backend-gst.tarafirst.com",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+# Allow cookies across subdomains
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'cookie',
+]
 # Define base directory and log path
 LOG_PATH = os.path.join(BASE_DIR, 'log')
 
