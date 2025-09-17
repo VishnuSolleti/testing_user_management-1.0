@@ -576,9 +576,9 @@ def accounts_login(request):
         # Create response with cookie support
         response = Response(response_data, status=status.HTTP_200_OK)
         
-        # Simple cookie settings for localhost testing
-        cookie_domain = 'localhost'    # Fixed to localhost for now
-        cookie_secure = False          # Allow HTTP for testing
+        # Cookie settings for cross-port localhost testing
+        cookie_domain = None     # No domain = works across ports (3000, 8000, etc.)
+        cookie_secure = False    # Allow HTTP for testing
         
         # Debug: Log what domain we're setting
         print(f"DEBUG: Setting cookies with domain={cookie_domain}, secure={cookie_secure}")
@@ -588,20 +588,20 @@ def accounts_login(request):
         response.set_cookie(
             'access_token',
             str(access_token),
-            domain=cookie_domain,                # None for local, .tarafirst.com for production
-            secure=cookie_secure,                # False for local, True for production
+            domain=cookie_domain,                # localhost for testing
+            secure=cookie_secure,                # False for HTTP
             httponly=True,                       # No JS access (XSS protection)
-            samesite='Lax',                     # CSRF protection
+            samesite='None',                     # Allow cross-site requests (localhost:3000 → localhost:8000)
             max_age=43200                       # 12 hours
         )
 
         response.set_cookie(
             'refresh_token',
             refresh_token,
-            domain=cookie_domain,                # None for local, .tarafirst.com for production
-            secure=cookie_secure,                # False for local, True for production
+            domain=cookie_domain,                # localhost for testing
+            secure=cookie_secure,                # False for HTTP
             httponly=True,                       # No JS access (XSS protection)
-            samesite='Lax',                     # CSRF protection
+            samesite='None',                     # Allow cross-site requests
             max_age=86400                       # 24 hours
         )
 
@@ -612,7 +612,7 @@ def accounts_login(request):
             domain=cookie_domain,
             secure=cookie_secure,
             httponly=False,                      # Allow JS access for context switching
-            samesite='Lax',
+            samesite='None',                     # Allow cross-site requests
             max_age=86400
         )
 
@@ -623,7 +623,7 @@ def accounts_login(request):
             domain=cookie_domain,
             secure=cookie_secure,
             httponly=False,                      # Allow JS access for service routing
-            samesite='Lax',
+            samesite='None',                     # Allow cross-site requests
             max_age=86400
         )
 
@@ -634,7 +634,7 @@ def accounts_login(request):
             domain=cookie_domain,
             secure=cookie_secure,
             httponly=False,                      # Allow JS access for organization context
-            samesite='Lax',
+            samesite='None',                     # Allow cross-site requests
             max_age=86400
         )
         
