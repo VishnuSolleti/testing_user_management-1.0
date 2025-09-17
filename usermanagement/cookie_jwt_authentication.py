@@ -46,6 +46,13 @@ class CookieJWTAuthentication(JWTAuthentication):
         
         return (user, validated_token)
 
+    def get_token_types(self):
+        """
+        Return token types that can be validated
+        """
+        from rest_framework_simplejwt.tokens import AccessToken
+        return [AccessToken]
+
     def get_validated_token(self, raw_token):
         """
         Validates an encoded JSON web token and returns a validated token
@@ -154,3 +161,4 @@ class CookieCSRFMiddleware:
             request._dont_enforce_csrf_checks = True
             
         return self.get_response(request)
+
