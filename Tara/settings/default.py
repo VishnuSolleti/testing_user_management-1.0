@@ -46,10 +46,8 @@ ALLOWED_HOSTS = [
 # Add these 3 lines anywhere in the file:
 
 # Cross-subdomain session cookies
-SESSION_COOKIE_DOMAIN = 'dev-backend.tarafirst.com'
-
-# Cross-subdomain CSRF cookies
-CSRF_COOKIE_DOMAIN = 'dev-backend.tarafirst.com'
+SESSION_COOKIE_DOMAIN = '.tarafirst.com'
+CSRF_COOKIE_DOMAIN = '.tarafirst.com'
 
 # Allow credentials in CORS
 CORS_ALLOW_CREDENTIALS = True
@@ -57,19 +55,14 @@ CORS_ALLOW_CREDENTIALS = True
 # DISABLE wildcard origins when using credentials (cookies)
 CORS_ALLOW_ALL_ORIGINS = False
 
-# Specific subdomain support for production
-CORS_ALLOWED_ORIGINS = [
-    "http://dev-backend-accounts.tarafirst.com",
-    "http://dev-backend-payroll.tarafirst.com",
-    "http://dev-backend-docdraft.tarafirst.com",
-    "http://dev-backend-invoicing.tarafirst.com",
-    "http://dev-backend-gst.tarafirst.com",
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
+# Use regex to match multiple domains/ports safely
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http?:\/\/(.*\.)?tarafirst\.com$",  # Matches any subdomain of tarafirst.com on http/https
+    r"^http?:\/\/localhost:\d+$",  # Matches localhost on any port
+    r"^http?:\/\/127\.0\.0\.1:\d+$",  # Matches 127.0.0.1 on any port
 ]
 
-# Allow cookies across subdomains
+# Keep your existing headers and methods
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -83,7 +76,6 @@ CORS_ALLOW_HEADERS = [
     'cookie',
 ]
 
-# Additional CORS settings for credentials
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -93,7 +85,6 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
-# Ensure preflight requests work
 CORS_PREFLIGHT_MAX_AGE = 86400
 # Define base directory and log path
 LOG_PATH = os.path.join(BASE_DIR, 'log')
