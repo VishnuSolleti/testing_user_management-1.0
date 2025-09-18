@@ -576,9 +576,9 @@ def accounts_login(request):
         # Create response with cookie support
         response = Response(response_data, status=status.HTTP_200_OK)
         
-        # Cookie settings for localhost testing
-        cookie_domain = None     # No domain = works across ports
-        cookie_secure = False    # Allow HTTP for local testing
+        # Cookie settings for cross-subdomain support
+        cookie_domain = '.tarafirst.com'    # Works across all subdomains
+        cookie_secure = False                # Allow HTTP for testing
         
         # Debug: Log what domain we're setting
         print(f"DEBUG: Setting cookies with domain={cookie_domain}, secure={cookie_secure}")
