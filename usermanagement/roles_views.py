@@ -366,131 +366,97 @@ def get_role_by_context(request):
         }, status=status.HTTP_404_NOT_FOUND)
 
 
-@api_view(['POST'])
-def bulk_user_details(request):
-    """
-    Retrieve user details (first name, last name, or email fallback) for multiple users.
-
-    **Authentication:**
-    - This endpoint does not enforce authentication by default (depends on project settings).
-      If authentication is enabled, a valid token must be provided in the request.
-
-    **Request Method:**
-    - POST
-
-    **Request Body:**
-    - JSON object with the following field:
-      - `user_ids` (list of integers, required):
-        A list of user IDs for which details need to be retrieved.
-
-      Example:
-      ```json
-      {
-          "user_ids": [1, 2, 3]
-      }
-      ```
-
-    **Functionality:**
-    - For each user ID in the request:
-      - Fetch the corresponding `Users` object.
-      - Attempt to retrieve its related `UserProfile` object (one-to-one relationship).
-        - If a profile exists, use `profile.first_name` and `profile.last_name`.
-        - If no profile exists, fallback to using the `user.email` as the `first_name`
-          and leave `last_name` empty.
-
-    **Response:**
-    - 200 OK:
-      Returns a list of user details. Each object contains:
-      - `id` (int): The user's ID.
-      - `first_name` (string): Either the profile's first name or email (if no profile exists).
-      - `last_name` (string): The profile's last name, or empty string if unavailable.
-
-      Example:
-      ```json
-      [
-          {
-              "id": 1,
-              "first_name": "John",
-              "last_name": "Doe"
-          },
-          {
-              "id": 2,
-              "first_name": "jane@example.com",
-              "last_name": ""
-          }
-      ]
-      ```
-
-    **Error Handling:**
-    - If a user does not have a `UserProfile`, the API safely falls back to email without raising errors.
-    - If `user_ids` is missing or empty, the API returns an empty list.
-
-    **Use Case:**
-    - Useful for bulk fetching user display names for showing in dropdowns,
-      tables, or team assignments where multiple user IDs need to be resolved at once.
-    """
-    user_ids = request.data.get("user_ids", [])
-    users = Users.objects.filter(id__in=user_ids)
-
-    results = []
-    for user in users:
-        try:
-            profile = user.userprofile  # One-to-one relation
-            first_name = profile.first_name if profile.first_name else ""
-            last_name = profile.last_name if profile.last_name else ""
-        except UserProfile.DoesNotExist:
-            # Fallback when no UserProfile exists
-            first_name = user.email
-            last_name = ""
-
-        results.append({
-            "id": user.id,
-            "first_name": first_name if first_name else user.email,
-            "last_name": last_name,
-        })
-
-    return Response(results)
-
-
 @api_view(['GET'])
-def get_user_name(request, user_id):
+@permission_classes([IsAuthenticated])
+def get_roles_by_business(request):
     """
-    Retrieve the full name (first + last) of a single user.
-    Falls back to email if no profile exists.
+    Retrieve all roles (role_id + role_name) associated with a business context.
 
-    **Request Method:**
-    - GET
+    Authentication:
+    - Requires a valid **Bearer Token** in the `Authorization` header.
+      Example: `Authorization: Bearer <access_token>`
 
-    **Path Parameter:**
-    - `user_id` (int, required)
+    Query Parameters:
+    - business_id (int, required): The unique ID of the business whose roles
+      need to be fetched.
 
-      Example:
-      ```
-      GET /api/users/5/name/
-      ```
+    Functionality:
+    - Fetches the `Context` object linked to the given `business_id`.
+    - Retrieves all `Role` objects associated with that context where
+      `context_type='business'`.
+    - Returns a JSON response containing `role_id` and `role_name` for each role.
 
-    **Response:**
+    Responses:
     - 200 OK:
-      Returns a string with the user's name.
+      Successfully retrieved roles for the given business.
       Example:
-      ```
-      "Alice Smith"
-      ```
+      {
+          "data": [
+              {"role_id": 1, "role_name": "Owner"},
+              {"role_id": 2, "role_name": "Manager"},
+              {"role_id": 3, "role_name": "Employee"}
+          ]
+      }
+
+    - 400 Bad Request:
+      If the `business_id` query parameter is missing.
+      Example:
+      {
+          "status": "error",
+          "message": "business query params are required."
+      }
 
     - 404 Not Found:
-      If the user does not exist.
+      If no `Context` exists for the given `business_id`.
+      Example:
+      {
+          "status": "error",
+          "message": "Context not found"
+      }
+
+    - 404 Not Found:
+      If no `Role` objects are found for the given context.
+      Example:
+      {
+          "status": "error",
+          "message": "Role not found in the specified context"
+      }
     """
-    user = get_object_or_404(Users, id=user_id)
+    business = request.query_params.get('business_id')
+    if not business:
+        return Response({
+            'status': 'error',
+            'message': 'business query params are required.'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        profile = user.userprofile  # One-to-one relation
-        first_name = profile.first_name or ""
-        last_name = profile.last_name or ""
-        full_name = f"{first_name} {last_name}".strip()
-    except UserProfile.DoesNotExist:
-        full_name = user.email
+        context = Context.objects.get(business=business)
+        roles = Role.objects.filter(context=context, context_type='business')
 
-    # Instead of JSON object, return just the name
-    return Response(full_name)
+        if not roles.exists():
+            return Response({
+                'status': 'error',
+                'message': 'Role not found in the specified context'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Format roles as role_id + role_name
+        role_data = [
+            {"role_id": role.id, "role_name": role.name}
+            for role in roles
+        ]
+
+        return Response({'data': role_data}, status=status.HTTP_200_OK)
+
+    except Context.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'Context not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'status': "error",
+            'message': str(e),
+        }, status=status.HTTP_400_BAD_REQUEST)
+
 
 
