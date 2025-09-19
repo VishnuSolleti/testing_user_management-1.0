@@ -577,7 +577,7 @@ def accounts_login(request):
         response = Response(response_data, status=status.HTTP_200_OK)
         
         # Cookie settings for cross-subdomain support
-        cookie_domain = None    # Works across all subdomains
+        cookie_domain = '.tarafirst.com'    # Works across all subdomains
         cookie_secure = False                # Allow HTTP for testing
         
         # Debug: Log what domain we're setting
