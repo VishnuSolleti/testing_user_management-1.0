@@ -2,11 +2,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import SubscriptionPlan, Module, ModuleSubscription, SubscriptionCycle, ModuleUsageCycle
+from .models import SubscriptionPlan, Module, ModuleSubscription, SubscriptionCycle, ModuleUsageCycle, Users, Context, UserContextRole
 from .serializers import SubscriptionPlanSerializer, ModuleSubscriptionSerializer
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-
+from django.utils import timezone
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -436,5 +436,135 @@ def update_module_usage_cycle(request):
     except Exception as e:
         return Response({
             'error': f'Error fetching subscriptions: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_subscription_notices(request):
+    """
+    Return subscription expiry/renewal notices for the current user's default session context.
+
+    Optional query params:
+    - module_id: filter notices to a specific module
+
+    Response example:
+    {
+      "context_id": 123,
+      "notices": [
+        {
+          "module_id": 1,
+          "module_name": "Payroll",
+          "plan_type": "trial",
+          "status": "expiring_soon",  # one of: active, expiring_soon, expired
+          "days_left": 3,
+          "message": "Your Payroll trial plan expires in 3 days. Please renew to avoid interruption.",
+          "action": {
+            "type": "renew",
+            "payment_endpoint": "/user_management/create-order/",
+            "required_params": ["context_id", "plan_id"],
+            "context_id": 123
+          }
+        }
+      ]
+    }
+    """
+    try:
+        user = request.user
+
+        # Resolve current context from default session
+        try:
+            user_session = user.get_default_session() or user.get_active_session()
+            context = user_session.active_context if user_session else None
+        except Exception:
+            context = None
+
+        if not context:
+            return Response({
+                'error': 'No active context found for user.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        module_id = request.query_params.get('module_id')
+
+        sub_filters = {
+            'context': context,
+            'status__in': ['active', 'trial']
+        }
+        if module_id:
+            sub_filters['module_id'] = module_id
+
+        subscriptions = ModuleSubscription.objects.select_related('module', 'plan').filter(**sub_filters)
+
+        # Determine user role in this context to tailor messages
+        role_type = None
+        try:
+            ucr = UserContextRole.objects.select_related('role').get(user=user, context=context, status='active')
+            role_type = ucr.role.role_type
+        except UserContextRole.DoesNotExist:
+            role_type = None
+
+        now = timezone.now()
+        notices = []
+        for sub in subscriptions:
+            # Compute status
+            days_left = None
+            status_label = 'active'
+            if sub.end_date:
+                delta = sub.end_date - now
+                days_left = max(0, delta.days)
+                if sub.end_date < now:
+                    status_label = 'expired'
+                elif days_left <= 7:
+                    status_label = 'expiring_soon'
+
+            # Tailored message based on role
+            module_name = sub.module.name
+            plan_type = sub.plan.plan_type if sub.plan else None
+
+            if status_label == 'expired':
+                if role_type in ['owner', 'admin']:
+                    msg = f"Your {module_name} plan has expired. Please renew to restore access."
+                else:
+                    msg = f"{module_name} access is currently unavailable. Please contact your administrator."
+            elif status_label == 'expiring_soon':
+                if role_type in ['owner', 'admin']:
+                    d = days_left if days_left is not None else 0
+                    when = "today" if d == 0 else ("tomorrow" if d == 1 else f"in {d} days")
+                    label = "trial " if plan_type == 'trial' else ""
+                    msg = f"Your {module_name} {label}plan expires {when}. Consider renewing to avoid interruption."
+                else:
+                    msg = f"{module_name} may become unavailable soon. Your administrator will handle renewals."
+            else:
+                # active and not expiring soon → no notice
+                continue
+
+            notice = {
+                'module_id': sub.module.id,
+                'module_name': module_name,
+                'plan_type': plan_type,
+                'status': status_label,
+                'days_left': days_left,
+                'message': msg,
+            }
+
+            # Provide actionable hint for payers (owner/admin)
+            if role_type in ['owner', 'admin'] and status_label in ['expired', 'expiring_soon']:
+                notice['action'] = {
+                    'type': 'renew',
+                    'payment_endpoint': '/user_management/create-order/',
+                    'required_params': ['context_id', 'subscription_plan_id'],
+                    'context_id': context.id
+                }
+
+            notices.append(notice)
+
+        return Response({
+            'context_id': context.id,
+            'notices': notices
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            'error': f'Failed to fetch subscription notices: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

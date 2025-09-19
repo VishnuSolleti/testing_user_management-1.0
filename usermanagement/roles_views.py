@@ -2,7 +2,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Role, Context
+from .models import Role, Context, Users, UserProfile
+from django.shortcuts import get_object_or_404
 from .serializers import RoleSerializer, RoleDetailSerializer, ContextWithRolesSerializer
 
 
@@ -363,5 +364,133 @@ def get_role_by_context(request):
             'status': 'error',
             'message': 'Role not found in the specified context'
         }, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+def bulk_user_details(request):
+    """
+    Retrieve user details (first name, last name, or email fallback) for multiple users.
+
+    **Authentication:**
+    - This endpoint does not enforce authentication by default (depends on project settings).
+      If authentication is enabled, a valid token must be provided in the request.
+
+    **Request Method:**
+    - POST
+
+    **Request Body:**
+    - JSON object with the following field:
+      - `user_ids` (list of integers, required):
+        A list of user IDs for which details need to be retrieved.
+
+      Example:
+      ```json
+      {
+          "user_ids": [1, 2, 3]
+      }
+      ```
+
+    **Functionality:**
+    - For each user ID in the request:
+      - Fetch the corresponding `Users` object.
+      - Attempt to retrieve its related `UserProfile` object (one-to-one relationship).
+        - If a profile exists, use `profile.first_name` and `profile.last_name`.
+        - If no profile exists, fallback to using the `user.email` as the `first_name`
+          and leave `last_name` empty.
+
+    **Response:**
+    - 200 OK:
+      Returns a list of user details. Each object contains:
+      - `id` (int): The user's ID.
+      - `first_name` (string): Either the profile's first name or email (if no profile exists).
+      - `last_name` (string): The profile's last name, or empty string if unavailable.
+
+      Example:
+      ```json
+      [
+          {
+              "id": 1,
+              "first_name": "John",
+              "last_name": "Doe"
+          },
+          {
+              "id": 2,
+              "first_name": "jane@example.com",
+              "last_name": ""
+          }
+      ]
+      ```
+
+    **Error Handling:**
+    - If a user does not have a `UserProfile`, the API safely falls back to email without raising errors.
+    - If `user_ids` is missing or empty, the API returns an empty list.
+
+    **Use Case:**
+    - Useful for bulk fetching user display names for showing in dropdowns,
+      tables, or team assignments where multiple user IDs need to be resolved at once.
+    """
+    user_ids = request.data.get("user_ids", [])
+    users = Users.objects.filter(id__in=user_ids)
+
+    results = []
+    for user in users:
+        try:
+            profile = user.userprofile  # One-to-one relation
+            first_name = profile.first_name if profile.first_name else ""
+            last_name = profile.last_name if profile.last_name else ""
+        except UserProfile.DoesNotExist:
+            # Fallback when no UserProfile exists
+            first_name = user.email
+            last_name = ""
+
+        results.append({
+            "id": user.id,
+            "first_name": first_name if first_name else user.email,
+            "last_name": last_name,
+        })
+
+    return Response(results)
+
+
+@api_view(['GET'])
+def get_user_name(request, user_id):
+    """
+    Retrieve the full name (first + last) of a single user.
+    Falls back to email if no profile exists.
+
+    **Request Method:**
+    - GET
+
+    **Path Parameter:**
+    - `user_id` (int, required)
+
+      Example:
+      ```
+      GET /api/users/5/name/
+      ```
+
+    **Response:**
+    - 200 OK:
+      Returns a string with the user's name.
+      Example:
+      ```
+      "Alice Smith"
+      ```
+
+    - 404 Not Found:
+      If the user does not exist.
+    """
+    user = get_object_or_404(Users, id=user_id)
+
+    try:
+        profile = user.userprofile  # One-to-one relation
+        first_name = profile.first_name or ""
+        last_name = profile.last_name or ""
+        full_name = f"{first_name} {last_name}".strip()
+    except UserProfile.DoesNotExist:
+        full_name = user.email
+
+    # Instead of JSON object, return just the name
+    return Response(full_name)
 
 
