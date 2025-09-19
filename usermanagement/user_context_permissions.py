@@ -156,7 +156,10 @@ def list_user_contexts(request):
                     'role_id': role.id,
                     'role_type': role.role_type,
                     'role_name': role.name,
-                    'permissions': list(role.permissions.all().values_list('name', flat=True))
+                    'permissions': list(
+                                UserFeaturePermission.objects.filter(user_context_role__role=role)
+                                .values_list('actions', flat=True)
+                            )
                 },
                 'module_subscriptions': subscription_data,
                 'created_at': context.created_at,
