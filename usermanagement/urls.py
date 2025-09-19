@@ -372,7 +372,10 @@ urlpatterns = [
     path('subscription-cycles', subscription_views.get_subscription_cycle, name='get_subscription_cycle'),
     path('get-module-usage-cycle/', subscription_views.get_module_usage_cycle, name='get_module_usage_cycle'),
     path('module-usage-cycle/update', subscription_views.update_module_usage_cycle, name='update_module_usage_cycle'),
-
+    path('subscriptions/notices', subscription_views.get_subscription_notices, name='get_subscription_notices'),
+    path('users/bulk-details/', views.bulk_user_details, name='bulk_user_details'),
+    path('roles/by-business', roles_views.get_roles_by_business, name='get_roles_by_business'),
+    path("users/<int:user_id>/name/", views.get_user_name, name="get_user_name"),
     path('test/', views.hello, name='hello'),
 
 ]

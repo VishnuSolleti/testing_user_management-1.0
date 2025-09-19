@@ -239,22 +239,22 @@ def get_module_permissions(request, module_id):
 def check_module_access(request, module_id):
     """
     Check if the user has access to a specific module in their current context.
-    
+
     Parameters:
         module_id: ID of the module to check access for
-    
+
     Returns:
         Access status and details about the user's access to the module
     """
     try:
         user = request.user
-        
+
         # Get the module
         module = get_object_or_404(Module, id=module_id)
-        
+
         # Get user's current default session
         default_session = user.get_default_session()
-        
+
         if not default_session or not default_session.active_context:
             return Response({
                 'has_access': False,
@@ -262,17 +262,27 @@ def check_module_access(request, module_id):
                 'module_id': module_id,
                 'module_name': module.name
             }, status=status.HTTP_200_OK)
-        
+
         context = default_session.active_context
-        
-        # Check if user has an active role in this context
-        try:
-            user_role = UserContextRole.objects.get(
-                user=user,
-                context=context,
-                status='active'
-            )
-        except UserContextRole.DoesNotExist:
+
+        # Check if user has an active role in this context (handle multiple roles)
+        user_role = None
+        ucr_qs = UserContextRole.objects.select_related('role').filter(
+            user=user,
+            context=context,
+            status='active'
+        )
+        if ucr_qs.exists():
+            priority = {'owner': 0, 'admin': 1, 'manager': 2, 'employee': 3, 'custom': 4}
+            picked_rank = 999
+            for u in ucr_qs:
+                rtype = (u.role.role_type or 'custom').lower()
+                rank = priority.get(rtype, 9)
+                if rank < picked_rank:
+                    user_role = u
+                    picked_rank = rank
+
+        if not user_role:
             return Response({
                 'has_access': False,
                 'reason': 'No active role in current context',
@@ -281,7 +291,7 @@ def check_module_access(request, module_id):
                 'context_id': context.id,
                 'context_name': context.name
             }, status=status.HTTP_200_OK)
-        
+
         # Check if there's an active subscription for this module in this context
         try:
             subscription = ModuleSubscription.objects.get(
@@ -289,11 +299,11 @@ def check_module_access(request, module_id):
                 module=module,
                 status__in=['active', 'trial']
             )
-            
+
             # Check if subscription is still valid
             from django.utils import timezone
             now = timezone.now()
-            
+
             if subscription.end_date and subscription.end_date < now:
                 return Response({
                     'has_access': False,
@@ -305,7 +315,7 @@ def check_module_access(request, module_id):
                     'subscription_status': subscription.status,
                     'subscription_end_date': subscription.end_date
                 }, status=status.HTTP_200_OK)
-            
+
             # User has access
             return Response({
                 'has_access': True,
@@ -325,7 +335,7 @@ def check_module_access(request, module_id):
                     'role_name': user_role.role.name
                 }
             }, status=status.HTTP_200_OK)
-            
+
         except ModuleSubscription.DoesNotExist:
             return Response({
                 'has_access': False,
@@ -340,7 +350,7 @@ def check_module_access(request, module_id):
                     'role_name': user_role.role.name
                 }
             }, status=status.HTTP_200_OK)
-        
+
     except Exception as e:
         logger.error(f"Error checking module access: {str(e)}")
         return Response({

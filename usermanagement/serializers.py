@@ -140,12 +140,11 @@ class ModuleSubscriptionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'context', 'context_name', 'module', 'module_name',
             'plan', 'plan_details', 'status', 'start_date', 'end_date',
-            'auto_renew', 'current_usage', 'last_usage_update',
-            'created_at', 'updated_at'
+            'auto_renew', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'plan_details',
-            'context_name', 'module_name', 'last_usage_update'
+            'context_name', 'module_name'
         ]
 
     def validate(self, data):
