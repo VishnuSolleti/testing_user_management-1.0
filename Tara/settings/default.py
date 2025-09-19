@@ -57,9 +57,9 @@ CORS_ALLOW_ALL_ORIGINS = False
 
 # Use regex to match multiple domains/ports safely
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^http?:\/\/(.*\.)?tarafirst\.com$",  # Matches any subdomain of tarafirst.com on http/https
-    r"^http?:\/\/localhost:\d+$",  # Matches localhost on any port
-    r"^http?:\/\/127\.0\.0\.1:\d+$",  # Matches 127.0.0.1 on any port
+    r"^https?:\/\/([a-zA-Z0-9-]+\.)?tarafirst\.com(:\d+)?$",  # ✅ allow subdomains + optional port
+    r"^https?:\/\/localhost(:\d+)?$",  # ✅ allow localhost + optional port
+    r"^https?:\/\/127\.0\.0\.1(:\d+)?$",  # ✅ allow 127.0.0.1 + optional port
 ]
 
 # Keep your existing headers and methods
