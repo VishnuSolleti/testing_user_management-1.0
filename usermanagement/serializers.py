@@ -12,10 +12,34 @@ from datetime import date
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for the Users model"""
 
+    # New fields (read-only, pulled from related models/properties)
+    full_name = serializers.SerializerMethodField(read_only=True)
+    mobile_number = serializers.CharField(read_only=True)
+    registration_flow = serializers.CharField(read_only=True)
+
     class Meta:
         model = Users
-        fields = ['id', 'email', 'created_at', 'status', 'service_request', 'created_by', 'is_active', 'is_super_admin']
-        read_only_fields = ['id', 'created_at','is_super_admin']
+        fields = [
+            'id',
+            'email',
+            'created_at',
+            'status',
+            'service_request',
+            'created_by',
+            'is_active',
+            'is_super_admin',
+            'full_name',
+            'mobile_number',
+            'registration_flow',
+        ]
+        read_only_fields = [
+            'id',
+            'created_at',
+            'is_super_admin',
+            'full_name',
+            'mobile_number',
+            'registration_flow',
+        ]
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -28,6 +52,16 @@ class UserSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
         return user
+
+    # --------------------------
+    # Custom field definitions
+    # --------------------------
+    @staticmethod
+    def get_full_name(obj):
+        """Combine first_name and last_name from UserProfile"""
+        first = obj.first_name or ""
+        last = obj.last_name or ""
+        return f"{first} {last}".strip() if first or last else None
 
 
 class ContextSerializer(serializers.ModelSerializer):
