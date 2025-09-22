@@ -2453,6 +2453,20 @@ def user_detail(request, pk):
         return Response({"message": "User deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_detail_by_token(request):
+    """
+    Get user details based on the token.
+    """
+    try:
+        user = request.user
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    except Users.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def upload_business_logo(request):

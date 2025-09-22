@@ -310,6 +310,7 @@ urlpatterns = [
 
     # User detail
     path('users/<int:pk>/', other_factors.user_detail, name='user-detail'),
+    path('users/', other_factors.user_detail_by_token, name='user_detail_by_token'),
 
     path('service-payments-history', service_payment.get_service_payment_history, name='service-payment-history'),
 
