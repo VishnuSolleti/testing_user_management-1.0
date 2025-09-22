@@ -146,7 +146,9 @@ def list_user_contexts(request):
             
             context_info = {
                 'context_id': context.id,
-                'context_name': context.name,
+                'business_id': context.business.id,
+                'name': context.name,
+                'legal_name': context.business.legal_name if context.business and context.business.legal_name else None,
                 'context_type': context.context_type,
                 'status': context.status,
                 'profile_status': context.profile_status,
