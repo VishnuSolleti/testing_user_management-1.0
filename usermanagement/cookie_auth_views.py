@@ -69,7 +69,7 @@ def cookie_logout(request):
         }, status=status.HTTP_200_OK)
         
         # Clear all authentication cookies
-        cookies_to_clear = ['access_token', 'refresh_token', 'user_context', 'active_service']
+        cookies_to_clear = ['access_token', 'refresh_token', 'user_context', 'active_service', 'organisation_id']
         
         for cookie_name in cookies_to_clear:
             response.set_cookie(
