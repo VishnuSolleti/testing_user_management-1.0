@@ -75,7 +75,7 @@ def cookie_logout(request):
             response.set_cookie(
                 cookie_name,
                 '',
-                domain='.dev-backend.tarafirst.com',
+                domain='.tarafirst.com',
                 secure=True,
                 httponly=True if cookie_name in ['access_token', 'refresh_token'] else False,
                 samesite='Lax',
