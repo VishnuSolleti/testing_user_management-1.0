@@ -54,18 +54,55 @@ def cookie_logout(request):
     Logout user and clear all authentication cookies
     """
     try:
-        # Try to blacklist the refresh token
+        # Get tokens from cookies
         refresh_token = request.COOKIES.get('refresh_token')
+        access_token = request.COOKIES.get('access_token')
+        
+        # Blacklist both refresh and access tokens
+        tokens_blacklisted = []
+        
+        # Blacklist refresh token
         if refresh_token:
             try:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
+                refresh = RefreshToken(refresh_token)
+                refresh.blacklist()
+                tokens_blacklisted.append('refresh_token')
+                logger.info(f"Successfully blacklisted refresh token for user {request.user.id}")
             except Exception as e:
                 logger.warning(f"Failed to blacklist refresh token: {e}")
         
+        # Blacklist access token
+        if access_token:
+            try:
+                # For access tokens, we need to create a RefreshToken from it and blacklist
+                # Since access tokens can't be directly blacklisted, we'll use a different approach
+                from rest_framework_simplejwt.tokens import UntypedToken
+                from rest_framework_simplejwt.exceptions import TokenError
+                
+                # Validate the access token first
+                validated_token = UntypedToken(access_token)
+                
+                # Add to blacklist using the token's jti (JWT ID)
+                from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+                from rest_framework_simplejwt.utils import aware_utcnow
+                
+                # Create a blacklist entry for the access token
+                jti = validated_token.get('jti')
+                if jti:
+                    # Find the outstanding token and blacklist it
+                    outstanding_token = OutstandingToken.objects.filter(jti=jti).first()
+                    if outstanding_token:
+                        BlacklistedToken.objects.get_or_create(token=outstanding_token)
+                        tokens_blacklisted.append('access_token')
+                        logger.info(f"Successfully blacklisted access token for user {request.user.id}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to blacklist access token: {e}")
+        
         # Create response
         response = Response({
-            'message': 'Logout successful'
+            'message': 'Logout successful',
+            'tokens_blacklisted': tokens_blacklisted
         }, status=status.HTTP_200_OK)
         
         # Clear all authentication cookies
@@ -76,7 +113,7 @@ def cookie_logout(request):
                 cookie_name,
                 '',
                 domain='.tarafirst.com',
-                secure=True,
+                secure=False,  # Match accounts-auth security setting
                 httponly=True if cookie_name in ['access_token', 'refresh_token'] else False,
                 samesite='Lax',
                 max_age=0,  # Expire immediately
@@ -161,12 +198,12 @@ def cookie_refresh_token(request):
             'access_token': new_access_token
         }, status=status.HTTP_200_OK)
         
-        # Update access token cookie
+        # Update access token cookie with correct domain settings
         response.set_cookie(
             'access_token',
             new_access_token,
-            domain='.dev-backend.tarafirst.com',
-            secure=True,
+            domain='.tarafirst.com',  # Match accounts-auth domain
+            secure=False,             # Match accounts-auth security setting
             httponly=True,
             samesite='Lax',
             max_age=43200  # 12 hours

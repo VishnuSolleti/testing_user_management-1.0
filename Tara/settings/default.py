@@ -101,6 +101,7 @@ INSTALLED_APPS = [
     'channels',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # Add JWT token blacklist
     'corsheaders',
     'django_celery_beat',
     'storages',
@@ -269,6 +270,7 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
+    'BLACKLIST_TOKEN_CHECKS': 'rest_framework_simplejwt.token_blacklist.models.BlacklistedToken',
 }
 
 AUTHENTICATION_BACKENDS = [
