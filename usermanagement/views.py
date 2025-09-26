@@ -652,7 +652,7 @@ def get_user_name(request, user_id):
         profile = user.userprofile  # One-to-one relation
         first_name = profile.first_name or ""
         last_name = profile.last_name or ""
-        full_name = f"{first_name} {last_name}".strip()
+        full_name = f"{first_name} {last_name}".strip()  or user.email
     except UserProfile.DoesNotExist:
         full_name = user.email
 

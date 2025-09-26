@@ -571,7 +571,7 @@ def handle_business_registration(request, config):
             # 7. Get login response
             login_response_data = get_login_response(user)
             
-            return Response({
+            response = Response({
                 'success': True,
                 'message': 'Business registration successful',
                 'registration_type': 'business',
@@ -588,6 +588,57 @@ def handle_business_registration(request, config):
                     'name': module.name
                 }
             }, status=status.HTTP_201_CREATED)
+            # Cookie settings for cross-subdomain support
+            cookie_domain = '.tarafirst.com'  # Works across all subdomains
+            cookie_secure = False  # Allow HTTP for testing
+
+            # Debug: Log what domain we're setting
+            print(f"DEBUG: Setting cookies with domain={cookie_domain}, secure={cookie_secure}")
+            print(f"DEBUG: Request host={request.get_host()}")
+
+            # Set environment-aware cookies
+            response.set_cookie(
+                'access_token',
+                login_response_data['access_token'],
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing (works with same domain)
+                max_age=43200  # 12 hours
+            )
+
+            response.set_cookie(
+                'refresh_token',
+                login_response_data['refresh_token'],
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing
+                max_age=86400  # 24 hours
+            )
+
+            # Set user context cookie for frontend state management
+            response.set_cookie(
+                'user_context',
+                str(context.id) if context else '',
+                domain=cookie_domain,
+                secure=cookie_secure,
+                httponly=False,  # Allow JS access for context switching
+                samesite='Lax',  # Lax for local testing
+                max_age=86400
+            )
+
+            # Set organization cookie for multi-tenant support
+            response.set_cookie(
+                'organization_id',
+                str(context.business.id) if context else '',
+                domain=cookie_domain,
+                secure=cookie_secure,
+                httponly=False,  # Allow JS access for organization context
+                samesite='Lax',  # Lax for local testing
+                max_age=86400
+            )
+            return response
             
     except Exception as e:
         logger.exception("Business registration failed")
@@ -724,12 +775,13 @@ def handle_service_registration(request, config):
             # 7. Get login response
             login_response_data = get_login_response(user)
             
-            return Response({
+            response = Response({
                 'success': True,
                 'message': 'Service registration successful',
                 'registration_type': 'service',
                 'user': login_response_data['user'],
-                'tokens': login_response_data['tokens'],
+                'access_token': login_response_data['access_token'],
+                'refresh_token': login_response_data['refresh_token'],
                 'context': {
                     'id': context.id,
                     'name': context.name,
@@ -740,6 +792,43 @@ def handle_service_registration(request, config):
                     'name': service.name
                 }
             }, status=status.HTTP_201_CREATED)
+
+            # Cookie settings for cross-subdomain support
+            cookie_domain = '.tarafirst.com'  # Works across all subdomains
+            cookie_secure = False  # Allow HTTP for testing
+
+            # Set environment-aware cookies
+            response.set_cookie(
+                'access_token',
+                login_response_data['access_token'],
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing (works with same domain)
+                max_age=43200  # 12 hours
+            )
+
+            response.set_cookie(
+                'refresh_token',
+                login_response_data['refresh_token'],
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing
+                max_age=86400  # 24 hours
+            )
+            response.set_cookie(
+                'service_id',
+                str(service.id) if service else '',
+                domain=cookie_domain,
+                secure=cookie_secure,
+                httponly=False,
+                samesite='Lax',
+                max_age=86400
+            )
+
+            return response
+
             
     except Exception as e:
         logger.exception("Service registration failed")
@@ -824,13 +913,45 @@ def handle_standard_registration(request, config):
             # Get login response
             login_response_data = get_login_response(user)
             
-            return Response({
+            response = Response({
                 'success': True,
                 'message': 'Standard registration successful',
                 'registration_type': 'standard',
                 'user': login_response_data['user'],
-                'tokens': login_response_data['tokens']
+                'access_token': login_response_data['access_token'],
+                'refresh_token': login_response_data['refresh_token']
             }, status=status.HTTP_201_CREATED)
+
+            # Cookie settings for cross-subdomain support
+            cookie_domain = '.tarafirst.com'  # Works across all subdomains
+            cookie_secure = False  # Allow HTTP for testing
+
+            # Debug: Log what domain we're setting
+            print(f"DEBUG: Setting cookies with domain={cookie_domain}, secure={cookie_secure}")
+            print(f"DEBUG: Request host={request.get_host()}")
+
+            # Set environment-aware cookies
+            response.set_cookie(
+                'access_token',
+                str(login_response_data['access_token']),
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing (works with same domain)
+                max_age=43200  # 12 hours
+            )
+
+            response.set_cookie(
+                'refresh_token',
+                login_response_data['refresh_token'],
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing
+                max_age=86400  # 24 hours
+            )
+
+            return response
             
     except Exception as e:
         logger.exception("Standard registration failed")
@@ -1035,13 +1156,45 @@ def handle_google_oauth_registration(request):
             
             logger.info(f"Created new Google OAuth user: {email}")
             
-            return Response({
+            response = Response({
                 'success': True,
                 'message': 'Google OAuth registration successful',
                 'registration_type': 'google_oauth',
                 'user': login_response_data['user'],
-                'tokens': login_response_data['tokens']
+                'access_token': login_response_data['access_token'],
+                'refresh_token': login_response_data['refresh_token']
             }, status=status.HTTP_201_CREATED)
+
+            # Cookie settings for cross-subdomain support
+            cookie_domain = '.tarafirst.com'  # Works across all subdomains
+            cookie_secure = False  # Allow HTTP for testing
+
+            # Debug: Log what domain we're setting
+            print(f"DEBUG: Setting cookies with domain={cookie_domain}, secure={cookie_secure}")
+            print(f"DEBUG: Request host={request.get_host()}")
+
+            # Set environment-aware cookies
+            response.set_cookie(
+                'access_token',
+                str(login_response_data['access_token']),
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing (works with same domain)
+                max_age=43200  # 12 hours
+            )
+
+            response.set_cookie(
+                'refresh_token',
+                login_response_data['refresh_token'],
+                domain=cookie_domain,  # localhost for testing
+                secure=cookie_secure,  # False for HTTP
+                httponly=True,  # No JS access (XSS protection)
+                samesite='Lax',  # Lax for local testing
+                max_age=86400  # 24 hours
+            )
+
+            return response
         
     except Exception as e:
         logger.exception("Google OAuth registration failed")

@@ -9,9 +9,10 @@ from .models import *
 
 
 # Utility function to create tokens
-def get_tokens_for_user(user, business_id):
+def get_tokens_for_user(user, business_id=None):
     refresh = RefreshToken.for_user(user)
-    refresh['org_id'] = business_id
+    if business_id:
+        refresh['org_id'] = business_id
     return {
         'access': str(refresh.access_token),
         'refresh': str(refresh)
@@ -182,7 +183,11 @@ def switch_user_context(request):
         user.set_default_session(user_session)
 
         # # Generate new token
-        tokens = get_tokens_for_user(user, context.business.id)
+        print(context.context_type)
+        if context.context_type == 'personal':
+            tokens = get_tokens_for_user(user)
+        else:
+            tokens = get_tokens_for_user(user, context.business.id)
 
         # Generate login-like response
         profile_data = generate_user_profile_response(user)
