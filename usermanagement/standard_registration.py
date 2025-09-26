@@ -219,7 +219,68 @@ def initial_registration(request):
         otp_obj.delete()
         login_response_data = get_login_response(user)
 
-        return Response(login_response_data, status=status.HTTP_201_CREATED)
+        response = Response(login_response_data, status=status.HTTP_201_CREATED)
+        # Cookie settings for cross-subdomain support
+        cookie_domain = '.tarafirst.com'  # Works across all subdomains
+        cookie_secure = False  # Allow HTTP for testing
+
+        # Debug: Log what domain we're setting
+        print(f"DEBUG: Setting cookies with domain={cookie_domain}, secure={cookie_secure}")
+        print(f"DEBUG: Request host={request.get_host()}")
+
+        # Set environment-aware cookies
+        response.set_cookie(
+            'access_token',
+            str(login_response_data.get('access_token')),
+            domain=cookie_domain,  # localhost for testing
+            secure=cookie_secure,  # False for HTTP
+            httponly=True,  # No JS access (XSS protection)
+            samesite='Lax',  # Lax for local testing (works with same domain)
+            max_age=43200  # 12 hours
+        )
+
+        response.set_cookie(
+            'refresh_token',
+            login_response_data.get('refresh_token'),
+            domain=cookie_domain,  # localhost for testing
+            secure=cookie_secure,  # False for HTTP
+            httponly=True,  # No JS access (XSS protection)
+            samesite='Lax',  # Lax for local testing
+            max_age=86400  # 24 hours
+        )
+
+        # Set user context cookie for frontend state management
+        response.set_cookie(
+            'user_context',
+            str(context_id) if context_id else '',
+            domain=cookie_domain,
+            secure=cookie_secure,
+            httponly=False,  # Allow JS access for context switching
+            samesite='Lax',  # Lax for local testing
+            max_age=86400
+        )
+
+        # Set active service cookie for service detection
+        response.set_cookie(
+            'active_service',
+            detected_service.get('service_key', ''),
+            domain=cookie_domain,
+            secure=cookie_secure,
+            httponly=False,  # Allow JS access for service routing
+            samesite='Lax',  # Lax for local testing
+            max_age=86400
+        )
+
+        # Set organization cookie for multi-tenant support
+        response.set_cookie(
+            'organization_id',
+            str(organization_id) if organization_id else '',
+            domain=cookie_domain,
+            secure=cookie_secure,
+            httponly=False,  # Allow JS access for organization context
+            samesite='Lax',  # Lax for local testing
+            max_age=86400
+        )
 
     except Exception as e:
         logger.error(f"Error during registration: {str(e)}")
