@@ -66,7 +66,7 @@ def detect_registration_type_from_url(request):
             'registration_flow': 'module',
             'account_type': 'business',
             'description': 'Business Registration with Module Subscription',
-            'required_fields': ['email', 'password', 'business_name', 'module_id', 'otp'],
+            'required_fields': ['email', 'password', 'business_name', 'otp'],
             'optional_fields': ['phone', 'address', 'gst_number']
         },
         'service': {
@@ -465,26 +465,28 @@ def handle_business_registration(request, config):
             return Response({
                 'error': 'User already exists with this email'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Validate module
-        try:
-            module = Module.objects.get(id=module_id)
-        except Module.DoesNotExist:
-            return Response({
-                'error': f'Module with ID {module_id} does not exist'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        # Validate trial plan exists
-        trial_plan = SubscriptionPlan.objects.filter(
-            module=module, 
-            plan_type='trial', 
-            is_active=True
-        ).first()
-        
-        if not trial_plan:
-            return Response({
-                'error': f'No trial plan available for module: {module.name}'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        module = None
+        trial_plan = None
+        if module_id:
+            # Validate module
+            try:
+                module = Module.objects.get(id=module_id)
+            except Module.DoesNotExist:
+                return Response({
+                    'error': f'Module with ID {module_id} does not exist'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Validate trial plan exists
+            trial_plan = SubscriptionPlan.objects.filter(
+                module=module,
+                plan_type='trial',
+                is_active=True
+            ).first()
+
+            if not trial_plan:
+                return Response({
+                    'error': f'No trial plan available for module: {module.name}'
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         # Create user and business context
         with transaction.atomic():
@@ -523,7 +525,7 @@ def handle_business_registration(request, config):
                 user=user,
                 defaults={
                     'registration_flow': config['registration_flow'],
-                    'initial_selection': module.name,
+                    'initial_selection': module.name if module else 'No module selected',
                     'registration_completed': False,
                     'registration_status': 'incomplete',
                     'steps_completed': ['user_created', 'context_created']
@@ -532,7 +534,7 @@ def handle_business_registration(request, config):
             if not created:
                 # Update existing record
                 user_registration.registration_flow = config['registration_flow']
-                user_registration.initial_selection = module.name
+                user_registration.initial_selection = module.name if module else 'No module selected'
                 user_registration.registration_completed = False
                 user_registration.registration_status = 'incomplete'
                 user_registration.steps_completed = ['user_created', 'context_created']
@@ -554,23 +556,24 @@ def handle_business_registration(request, config):
             )
             
             # 7. Create module subscription
-            ModuleSubscription.objects.create(
-                context=context,
-                module=module,
-                plan=trial_plan,
-                status='trial',
-                start_date=timezone.now(),
-                end_date=timezone.now() + timezone.timedelta(days=trial_plan.billing_cycle_days),
-                auto_renew=False,  # Don't auto-renew trial
-                added_by=user  # Set the added_by field to the user being registered
-            )
+            if trial_plan:
+                ModuleSubscription.objects.create(
+                    context=context,
+                    module=module,
+                    plan=trial_plan,
+                    status='trial',
+                    start_date=timezone.now(),
+                    end_date=timezone.now() + timezone.timedelta(days=trial_plan.billing_cycle_days),
+                    auto_renew=False,  # Don't auto-renew trial
+                    added_by=user  # Set the added_by field to the user being registered
+                )
             
             # 6. Delete OTP
             otp_obj.delete()
             
             # 7. Get login response
             login_response_data = get_login_response(user)
-            
+
             response = Response({
                 'success': True,
                 'message': 'Business registration successful',
@@ -586,7 +589,7 @@ def handle_business_registration(request, config):
                 'module': {
                     'id': module.id,
                     'name': module.name
-                }
+                } if module else None
             }, status=status.HTTP_201_CREATED)
             # Cookie settings for cross-subdomain support
             cookie_domain = '.tarafirst.com'  # Works across all subdomains
