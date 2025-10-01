@@ -988,6 +988,10 @@ def handle_standard_registration(request, config):
                 'message': 'Standard registration successful',
                 'registration_type': 'standard',
                 'user': login_response_data['user'],
+                'context': {
+                    'id': context.id,
+                    'name': context.name
+                } if module_id else None,
                 'access_token': login_response_data['access_token'],
                 'refresh_token': login_response_data['refresh_token']
             }, status=status.HTTP_201_CREATED)
