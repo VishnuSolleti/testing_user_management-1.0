@@ -912,6 +912,73 @@ def handle_standard_registration(request, config):
             
             # Delete OTP
             otp_obj.delete()
+
+            module_id = request.data.get('module_id')
+            if module_id:
+                # Validate module
+                try:
+                    module = Module.objects.get(id=module_id)
+                except Module.DoesNotExist:
+                    return Response({
+                        'error': f'Module with ID {module_id} does not exist'
+                    }, status=status.HTTP_404_NOT_FOUND)
+
+                # Validate trial plan exists
+                trial_plan = SubscriptionPlan.objects.filter(
+                    module=module,
+                    plan_type='trial',
+                    is_active=True
+                ).first()
+
+                if not trial_plan:
+                    return Response({
+                        'error': f'No trial plan available for module: {module.name}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                # 2. Create personal context
+                context = Context.objects.create(
+                    name=request.data.get('first_name')+' '+ request.data.get('last_name', '')
+                    if request.data.get('first_name') else 'Personal Context',
+                    context_type='personal',
+                    owner_user=user,
+                    status='active',
+                    profile_status='incomplete',
+                    metadata={'account_type': 'personal'}
+                )
+                from .models import UserSession
+                user_session = UserSession.objects.create(
+                    user=user,
+                    active_context=context,
+                    is_active=True,
+                    default_session=True,  # Set as default since it's their first business context
+                    session_data={'registration_type': 'business'}
+
+                )
+
+                # 5. Get or create owner role for this context
+                owner_role = Role.objects.get(
+                    context=context,
+                    role_type='owner'
+                )
+
+                # 6. Create user context role (owner)
+                user_context_role = UserContextRole.objects.create(
+                    user=user,
+                    context=context,
+                    role=owner_role,
+                    status='active',
+                    added_by=user  # Self-registered
+                )
+                ModuleSubscription.objects.create(
+                    context=context,
+                    module=module,
+                    plan=trial_plan,
+                    status='trial',
+                    start_date=timezone.now(),
+                    end_date=timezone.now() + timezone.timedelta(days=trial_plan.billing_cycle_days),
+                    auto_renew=False,  # Don't auto-renew trial
+                    added_by=user  # Set the added_by field to the user being registered
+                )
+
             
             # Get login response
             login_response_data = get_login_response(user)
