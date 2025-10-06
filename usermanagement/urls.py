@@ -377,6 +377,12 @@ urlpatterns = [
     path('users/bulk-details/', views.bulk_user_details, name='bulk_user_details'),
     path('roles/by-business', roles_views.get_roles_by_business, name='get_roles_by_business'),
     path("users/<int:user_id>/name/", views.get_user_name, name="get_user_name"),
+
+    # User Profile
+    path('users/<int:user_id>/profile/', personal_context_registration.get_user_profile_by_user,
+                                                                          name='get-user-profile-by-user'),
+    # Manage user profile by Profile ID (CRUD)
+    path('user-profiles/<int:profile_id>/', personal_context_registration.user_profile_detail, name='user-profile-detail'),
     path('test/', views.hello, name='hello'),
 
 ]

@@ -34,6 +34,12 @@ def logo_upload_path(instance, filename):
     # Construct the upload path
     return os.path.join(business_name, 'logo', filename)
 
+def profile_picture_upload_path(instance, filename):
+    # Get the name of the user, replace spaces with underscores
+    user_email = instance.user.email
+    # Construct the upload path
+    return os.path.join(user_email, str(instance.id), 'profile_pictures', filename)
+
 
 SERVICE_TASK_MAP = {
     "labour-license": [

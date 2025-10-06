@@ -496,6 +496,12 @@ class UserProfile(models.Model):
     UserProfile: Handles personal information
     Moved from Users model: first_name, last_name, mobile_number
     """
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not_to_say', 'Prefer not to say')
+    ]
     user = models.OneToOneField(
         Users, 
         on_delete=models.CASCADE, 
@@ -504,7 +510,13 @@ class UserProfile(models.Model):
     first_name = models.CharField(max_length=40, null=True, blank=True, default=None)
     last_name = models.CharField(max_length=40, null=True, blank=True, default=None)
     mobile_number = models.CharField(max_length=15, null=True, blank=True)
-    
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=20, choices=GENDER_CHOICES, null=True, blank=True)
+    personal_email = models.EmailField(null=True, blank=True)
+    work_address = models.JSONField(default=dict, blank=True, help_text="Work address details in JSON format")
+    personal_address = models.JSONField(default=dict, blank=True, help_text="Personal address details in JSON format")
+    profile_picture = models.FileField(upload_to=profile_picture_upload_path, null=True, blank=True,
+                                                                                            storage=PrivateS3Storage())
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

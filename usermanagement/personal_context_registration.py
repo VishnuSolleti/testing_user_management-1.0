@@ -6,10 +6,11 @@ from django.db import transaction
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 import logging
+from .serializers import UserProfileSerializer
 
 from .models import (
     Users, Context, Role, UserContextRole, Module,
-    ModuleFeature, UserFeaturePermission, SubscriptionPlan, ModuleSubscription, Business, UserKYC
+    ModuleFeature, UserFeaturePermission, SubscriptionPlan, ModuleSubscription, Business, UserKYC, UserProfile
 )
 
 
@@ -321,4 +322,71 @@ def get_context_subscriptions(request, context_id):
         return Response(
             {"error": f"Failed to get subscriptions: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_profile_by_user(request, user_id):
+    """
+    Retrieve a user's profile.
+
+    GET: Retrieve user profile details.
+
+    Args:
+        request
+        user_id (int): The ID of the user to manage.
+    """
+    try:
+        user = Users.objects.get(id=user_id)
+    except Users.DoesNotExist:
+        return Response(
+            {"error": "User not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == 'GET':
+        # Retrieve user profile details
+        user_profile = UserProfile.objects.get(user=user)
+        serializer = UserProfileSerializer(user_profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def user_profile_detail(request, profile_id):
+    """
+    Retrieve, update, or delete a user's profile.
+
+    GET: Retrieve user profile details.
+    PUT: Update user profile details.
+    DELETE: Delete user profile.
+
+    Args:
+        request
+        pk (int): The ID of the user to manage.
+    """
+    try:
+        user_profile = UserProfile.objects.get(id=profile_id)
+    except UserProfile.DoesNotExist:
+        return Response(
+            {"error": "User not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    user = user_profile.user
+    if request.method == 'GET':
+        serializer = UserProfileSerializer(user_profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    elif request.method == 'PUT':
+        # Update user profile details
+        instance = UserProfileSerializer(user_profile, data=request.data, partial=True)
+        if instance.is_valid():
+            instance.save()
+            return Response(instance.data, status=status.HTTP_200_OK)
+        return Response(instance.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        user_profile.delete()
+        return Response(
+            {"message": "User profile deleted successfully."},
+            status=status.HTTP_200_OK
         )
