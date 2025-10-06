@@ -36,8 +36,8 @@ from drf_spectacular.types import OpenApiTypes
 
 from .get_login_data import get_login_response
 from .models import (
-    Context, Role, UserContextRole, Service, ServiceRequest, 
-    PendingUserOTP, Module, SubscriptionPlan, ModuleSubscription, Users
+    Context, Role, UserContextRole, Service, ServiceRequest, UserSession,
+    PendingUserOTP, Module, SubscriptionPlan, ModuleSubscription, Users, UserProfile, UserRegistration
 )
 from Tara.settings.default import *
 from .rate_limit_decorator import rate_limit
@@ -890,7 +890,6 @@ def handle_standard_registration(request, config):
             user.save()
             
             # 2. Update UserRegistration (registration flow is now in UserRegistration)
-            from .models import UserRegistration
             user_registration, created = UserRegistration.objects.get_or_create(
                 user=user,
                 defaults={
@@ -909,6 +908,17 @@ def handle_standard_registration(request, config):
                 user_registration.registration_status = 'incomplete'
                 user_registration.steps_completed = ['user_created']
                 user_registration.save()
+            user_profile, created = UserProfile.objects.get_or_create(
+                user=user,
+                defaults={
+                    "first_name": request.data.get('first_name', ''),
+                    "last_name": request.data.get('last_name', '')
+                }
+            )
+            if not created:
+                user_profile.first_name = request.data.get('first_name', '')
+                user_profile.last_name = request.data.get('last_name', '')
+                user_profile.save()
             
             # Delete OTP
             otp_obj.delete()
@@ -944,14 +954,12 @@ def handle_standard_registration(request, config):
                     profile_status='incomplete',
                     metadata={'account_type': 'personal'}
                 )
-                from .models import UserSession
                 user_session = UserSession.objects.create(
                     user=user,
                     active_context=context,
                     is_active=True,
                     default_session=True,  # Set as default since it's their first business context
                     session_data={'registration_type': 'business'}
-
                 )
 
                 # 5. Get or create owner role for this context

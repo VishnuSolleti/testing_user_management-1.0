@@ -64,6 +64,30 @@ class UserSerializer(serializers.ModelSerializer):
         return f"{first} {last}".strip() if first or last else None
 
 
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializer for the UserProfile model"""
+    email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            'id',
+            'first_name',
+            'last_name',
+            'email',
+            'mobile_number',
+            'date_of_birth',
+            'gender',
+            'personal_email',
+            'work_address',
+            'personal_address',
+            'profile_picture',
+        ]
+        read_only_fields = ['id', 'user_email']
+
+
+
+
 class ContextSerializer(serializers.ModelSerializer):
     """Serializer for the Context model"""
 
