@@ -1906,6 +1906,8 @@ class Consultation(models.Model):
     email = models.EmailField()  # No unique constraint
     mobile_number = models.CharField(
         max_length=20,
+        null=True,
+        blank=True,
         validators=[
             RegexValidator(
                 regex=r'^\+?\d{10,15}$',

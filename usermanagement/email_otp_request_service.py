@@ -111,7 +111,7 @@ def send_otp_email(to_email: str, otp_code: str, name: Optional[str] = None) -> 
     This is an automated message, please do not reply to this email.
     © 2024 TaraFirst. All rights reserved.
     """
-    to_email = "contact@tarafirst.com"
+    # to_email = "contact@tarafirst.com"
     try:
         response = ses_client.send_email(
             Source=sender_email,

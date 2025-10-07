@@ -2236,7 +2236,10 @@ def send_customer_notification(consultation, join_url):
         aws_access_key_id=AWS_ACCESS_KEY_ID,
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY
     )
+    formatted_date = datetime.strptime(str(consultation.date), "%Y-%m-%d").strftime("%d-%b-%Y")
 
+    # Conditionally include mobile number only if available
+    mobile_info = f"📞 Mobile: {consultation.mobile_number}" if consultation.mobile_number else ""
     """ Sends an email notification using AWS SES """
     subject = "Consultation Booking Confirmation"
     body = f"""
@@ -2244,9 +2247,9 @@ def send_customer_notification(consultation, join_url):
 
     Your consultation has been successfully booked.
 
-    📅 Date: {consultation.date}
+    📅 Date: {formatted_date}
     ⏰ Time: {consultation.time}
-    📞 Mobile: {consultation.mobile_number}
+    {mobile_info}
 
     Our team will contact you soon.
 
@@ -2276,7 +2279,10 @@ def send_admin_notification(consultation, join_url):
         aws_access_key_id=AWS_ACCESS_KEY_ID,
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY
     )
+    formatted_date = datetime.strptime(str(consultation.date), "%Y-%m-%d").strftime("%d-%b-%Y")
 
+    # Conditionally include mobile number only if available
+    mobile_info = f"📞 Mobile: {consultation.mobile_number}\n" if consultation.mobile_number else ""
     """ Sends an email notification to the admin when a consultation is booked """
     subject = "New Consultation Booking Notification"
     body = f"""
@@ -2286,9 +2292,9 @@ def send_admin_notification(consultation, join_url):
 
     🧑 Name: {consultation.name}
     📧 Email: {consultation.email}
-    📞 Mobile: {consultation.mobile_number}
-    📅 Date: {consultation.date}
+    📅 Date: {formatted_date}
     ⏰ Time: {consultation.time}
+    {mobile_info}
 
 
     Please follow up with the customer as required.
@@ -2299,7 +2305,7 @@ def send_admin_notification(consultation, join_url):
 
     response = ses_client.send_email(
         Source="admin@tarafirst.com",  # Must be verified in AWS SES
-        Destination={"ToAddresses": ["admin@tarafirst.com"]},  # Replace with actual admin email
+        Destination={"ToAddresses": ["contact@tarafirst.com"]},  # Replace with actual admin email
         Message={
             "Subject": {"Data": subject},
             "Body": {"Text": {"Data": body}},
