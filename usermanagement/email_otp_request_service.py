@@ -138,3 +138,5 @@ def send_otp_email(to_email: str, otp_code: str, name: Optional[str] = None) -> 
     except Exception as e:
         print(f"Error sending email: {str(e)}")
         raise
+
+#test
