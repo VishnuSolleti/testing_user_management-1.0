@@ -42,6 +42,7 @@ from .rate_limit_decorator import rate_limit, rate_limit_login
 from django.shortcuts import get_object_or_404
 
 # Module Management APIs
+# OTP Management APIs
 
 
 @api_view(['POST'])
