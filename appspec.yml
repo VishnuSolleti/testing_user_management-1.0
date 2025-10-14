@@ -11,9 +11,10 @@ hooks:
     - location: scripts/install_dep.sh
       timeout: 300
       runas: root
+
     - location: scripts/before_install.sh
       timeout: 300
-      runas: root
+      runas: ubuntu
 
   AfterInstall:
     - location: scripts/stop_container.sh
