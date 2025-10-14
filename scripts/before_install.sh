@@ -16,7 +16,7 @@ fi
 
 # 2. Copy .env to deployment folder
 if [ -f "$SOURCE_ENV" ]; then
-    echo "[BeforeInstall] Copying .env to deployment folder..."
+    echo "[BeforeInstall] Copying .env to deployment folder......"
     cp "$SOURCE_ENV" "$TARGET_ENV"
     chown ubuntu:ubuntu "$TARGET_ENV"
     chmod 600 "$TARGET_ENV"
