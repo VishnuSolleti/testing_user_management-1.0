@@ -5,17 +5,16 @@ services:
     ports:
       - "8000:8000"
     restart: always
-    command: >
-      gunicorn Tara.wsgi:application --bind 0.0.0.0:8000
+    command: uvicorn Tara.asgi:application --host 0.0.0.0 --port 80000
     env_file:
-      - ../env/global.env
+      - .env
     networks:
-      - micro_net
+      - taranet
     healthcheck:
       test: [ "CMD-SHELL", "python -c 'import urllib.request; exit(0) if urllib.request.urlopen(\"http://localhost:8000/user_management/test/\").status == 200 else exit(1)'" ]
       interval: 30s
       timeout: 5s
       retries: 5
 networks:
-  micro_net:
-    external: true
+  taranet:
+    driver: bridge
