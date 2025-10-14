@@ -49,5 +49,5 @@ EXPOSE 8000
 #HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 #    CMD curl -f http://localhost:8000/user_management/test/ || exit 1
 
-# Run Gunicorn
-CMD ["gunicorn", "Tara.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Run Uvicorn for ASGI
+CMD ["uvicorn", "Tara.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
